@@ -1,0 +1,7 @@
+TheDigitalMemoryLane_Deployable/
+├── backend/
+│   ├── server.py
+│   ├── requirements.txt
+│   └── public/
+│       └── index.html
+└── frontend/   (empty for now)
