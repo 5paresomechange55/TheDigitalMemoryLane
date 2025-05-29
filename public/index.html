@@ -2,75 +2,63 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>The Digital Memory Lane</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Nostalgic font -->
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+
   <style>
     body {
-      margin: 0;
-      font-family: 'Segoe UI', sans-serif;
-      background-color: #fafafa;
-      color: #222;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 40px 20px;
+      font-family: 'Press Start 2P', monospace;
+      background: linear-gradient(to bottom, #fdf6e3, #f5deb3);
+      color: #333;
     }
-
-    header {
-      text-align: center;
-      margin-bottom: 30px;
-    }
-
-    header h1 {
-      font-size: 2.5em;
-      margin-bottom: 10px;
-    }
-
-    header p {
-      font-size: 1.2em;
-      color: #555;
-    }
-
-    .grid-preview {
-      width: 300px;
-      height: 300px;
-      background: repeating-linear-gradient(
-        0deg, #ccc, #ccc 1px, #fff 1px, #fff 10px
-      ), repeating-linear-gradient(
-        90deg, #ccc, #ccc 1px, #fff 1px, #fff 10px
-      );
-      margin: 30px 0;
-      border: 2px solid #ddd;
-    }
-
-    footer {
-      margin-top: 40px;
-      font-size: 0.9em;
-      color: #777;
+    canvas {
+      image-rendering: pixelated;
     }
   </style>
 </head>
-<body>
-
-    <p>Own a piece of history. Upload your image to a pixel grid that lasts forever.</p>
+<body class="min-h-screen flex flex-col items-center py-8 px-4">
+  <!-- Header -->
+  <header class="text-center mb-6">
+    <h1 class="text-3xl text-blue-800 mb-2">🕹️ The Digital Memory Lane</h1>
+    <p class="text-base text-gray-700 max-w-xl mx-auto">
+      A pixel for your memory. A canvas for your legacy. Buy a space that lasts forever.
+    </p>
   </header>
 
-  <div class="grid-preview"></div>
+  <!-- Canvas & Interaction Area -->
+  <section class="w-full max-w-5xl flex flex-col items-center space-y-4">
+    <div class="border-4 border-gray-800 shadow-lg overflow-auto max-h-[600px]">
+      <canvas id="pixelCanvas" width="1000" height="3000" class="block mx-auto bg-white"></canvas>
+    </div>
 
-  <p>Coming soon: Interactive grid, Stripe checkout, and more.</p>
+    <!-- Info Panel -->
+    <div class="bg-yellow-100 border border-yellow-300 p-4 rounded text-center w-full max-w-md">
+      <p class="text-gray-800 mb-2">🎯 <strong>Selected Pixels:</strong> <span id="pixelCount">0</span></p>
+      <p class="text-gray-800">💰 <strong>Total Price:</strong> $<span id="totalPrice">0</span></p>
+    </div>
 
-  <footer>
-    &copy; 2025 TheDigitalMemoryLane.com
+    <!-- Payment Button -->
+    <button id="payButton" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg shadow-md">
+      💳 Buy My Pixels
+    </button>
+
+    <!-- Error Message -->
+    <p id="errorMessage" class="text-red-600 text-sm mt-2"></p>
+  </section>
+
+  <!-- Footer -->
+  <footer class="mt-10 text-center text-xs text-gray-600">
+    &copy; 2025 The Digital Memory Lane – Pixels that Last Forever
   </footer>
-<script src="grid.js"></script>
+
+  <!-- Stripe & Grid Script -->
+  <script src="https://js.stripe.com/v3/"></script>
+  <script src="grid.js"></script>
 </body>
-<h1>The Digital Memory Lane</h1>
-<p>Click and drag to select pixels. Each pixel costs $1.</p>
-<canvas id="pixelCanvas" width="1000" height="3000" style="border:1px solid #ccc;"></canvas>
-<p>Selected Pixels: <span id="pixelCount">0</span></p>
-<p>Total Price: $<span id="totalPrice">0</span></p>>
-
-<button id="payButton">Pay Now</button>
-<p id="errorMessage" style="color:red;"></p>
-
 </html>
