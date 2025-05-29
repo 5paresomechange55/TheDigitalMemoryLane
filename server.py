@@ -13,6 +13,14 @@ def index():
 def serve_static(path):
     return send_from_directory("public", path)
 
+@app.route("/success")
+def success():
+    return send_from_directory("public", "success.html")
+
+@app.route("/cancel")
+def cancel():
+    return send_from_directory("public", "cancel.html")
+
 @app.route("/create-checkout-session", methods=["POST"])
 def create_checkout_session():
     data = request.get_json()
@@ -23,13 +31,13 @@ def create_checkout_session():
                 "price_data": {
                     "currency": "usd",
                     "product_data": {"name": "Pixel Space"},
-                    "unit_amount": 100,
+                    "unit_amount": 100,  # $1.00 in cents
                 },
                 "quantity": data["pixels"],
             }],
             mode="payment",
-            success_url="https://example.com/success",
-            cancel_url="https://example.com/cancel",
+            success_url="https://thedigitalmemorylane.onrender.com/success",
+            cancel_url="https://thedigitalmemorylane.onrender.com/cancel",
         )
         return jsonify({"id": session.id})
     except Exception as e:
