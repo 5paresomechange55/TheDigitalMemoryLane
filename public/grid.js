@@ -1,50 +1,49 @@
 const canvas = document.getElementById("pixelCanvas");
 const ctx = canvas.getContext("2d");
-const pixelSize = 1;
 
-let selectedPixels = new Set();
 let scale = 1;
-let offsetX = 0;
-let offsetY = 0;
+let originX = 0;
+let originY = 0;
 let isDragging = false;
 let dragStart = { x: 0, y: 0 };
+let selectedPixels = new Set();
+const pixelSize = 1;
+const pixelPrice = 1;
 
-const nostalgicColors = ["#ffcc00", "#ff66cc", "#66ccff", "#99ff99", "#cc66ff"];
+function drawCanvas() {
+  ctx.save();
+  ctx.setTransform(scale, 0, 0, scale, originX, originY);
+  ctx.clearRect(-originX / scale, -originY / scale, canvas.width / scale, canvas.height / scale);
 
-function getPixelKey(x, y) {
-  return `${x},${y}`;
-}
+  ctx.fillStyle = "#fff8dc";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-function drawPixel(x, y, color) {
-  ctx.fillStyle = color;
-  ctx.fillRect(x, y, pixelSize, pixelSize);
-}
-
-function redrawCanvas() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  for (let key of selectedPixels) {
+  selectedPixels.forEach(key => {
     const [x, y] = key.split(",").map(Number);
-    drawPixelTransformed(x, y);
-  }
+    ctx.fillStyle = "#b5651d"; // nostalgic brown
+    ctx.fillRect(x, y, 1, 1);
+  });
+
+  ctx.restore();
 }
 
-function drawPixelTransformed(x, y) {
-  const color = nostalgicColors[Math.floor(Math.random() * nostalgicColors.length)];
-  ctx.fillStyle = color;
-  ctx.fillRect((x + offsetX) * scale, (y + offsetY) * scale, scale, scale);
+function getPixelCoords(x, y) {
+  const realX = (x - originX) / scale;
+  const realY = (y - originY) / scale;
+  return [Math.floor(realX), Math.floor(realY)];
 }
 
-canvas.addEventListener("mousedown", (e) => {
+canvas.addEventListener("mousedown", e => {
   isDragging = true;
   dragStart = { x: e.clientX, y: e.clientY };
 });
 
-canvas.addEventListener("mousemove", (e) => {
+canvas.addEventListener("mousemove", e => {
   if (isDragging) {
-    offsetX += (e.clientX - dragStart.x) / scale;
-    offsetY += (e.clientY - dragStart.y) / scale;
+    originX += e.clientX - dragStart.x;
+    originY += e.clientY - dragStart.y;
     dragStart = { x: e.clientX, y: e.clientY };
-    redrawCanvas();
+    drawCanvas();
   }
 });
 
@@ -52,67 +51,120 @@ canvas.addEventListener("mouseup", () => {
   isDragging = false;
 });
 
-canvas.addEventListener("mouseleave", () => {
-  isDragging = false;
-});
-
-canvas.addEventListener("wheel", (e) => {
+canvas.addEventListener("wheel", e => {
   e.preventDefault();
-  const zoomIntensity = 0.1;
-  const zoom = e.deltaY < 0 ? 1 + zoomIntensity : 1 - zoomIntensity;
+  const zoomFactor = 1.1;
+  const zoom = e.deltaY < 0 ? zoomFactor : 1 / zoomFactor;
+  const mouseX = e.offsetX;
+  const mouseY = e.offsetY;
+
+  originX = mouseX - (mouseX - originX) * zoom;
+  originY = mouseY - (mouseY - originY) * zoom;
   scale *= zoom;
+  drawCanvas();
+}, { passive: false });
 
-  // Clamp scale for usability
-  scale = Math.max(1, Math.min(scale, 20));
-  redrawCanvas();
-});
-
-canvas.addEventListener("click", (e) => {
-  const rect = canvas.getBoundingClientRect();
-  const x = Math.floor((e.clientX - rect.left) / scale - offsetX);
-  const y = Math.floor((e.clientY - rect.top) / scale - offsetY);
-  const key = getPixelKey(x, y);
-
+canvas.addEventListener("click", e => {
+  const [x, y] = getPixelCoords(e.offsetX, e.offsetY);
+  const key = `${x},${y}`;
   if (selectedPixels.has(key)) {
     selectedPixels.delete(key);
   } else {
     selectedPixels.add(key);
   }
-  redrawCanvas();
-  updateStats();
+  updateUI();
+  drawCanvas();
 });
 
-function updateStats() {
-  document.getElementById("pixelCount").textContent = selectedPixels.size;
-  document.getElementById("totalPrice").textContent = selectedPixels.size * 1;
+// Mobile touch support
+let lastTouchDist = 0;
+let lastTouchCenter = null;
+
+canvas.addEventListener("touchstart", e => {
+  if (e.touches.length === 2) {
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    lastTouchDist = Math.hypot(dx, dy);
+    lastTouchCenter = {
+      x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+      y: (e.touches[0].clientY + e.touches[1].clientY) / 2
+    };
+  } else if (e.touches.length === 1) {
+    isDragging = true;
+    dragStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  }
+}, { passive: false });
+
+canvas.addEventListener("touchmove", e => {
+  e.preventDefault();
+  if (e.touches.length === 2) {
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    const newDist = Math.hypot(dx, dy);
+    const newCenter = {
+      x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+      y: (e.touches[0].clientY + e.touches[1].clientY) / 2
+    };
+
+    const zoom = newDist / lastTouchDist;
+    originX = newCenter.x - (newCenter.x - originX) * zoom;
+    originY = newCenter.y - (newCenter.y - originY) * zoom;
+    scale *= zoom;
+
+    lastTouchDist = newDist;
+    lastTouchCenter = newCenter;
+    drawCanvas();
+  } else if (e.touches.length === 1 && isDragging) {
+    const touch = e.touches[0];
+    originX += touch.clientX - dragStart.x;
+    originY += touch.clientY - dragStart.y;
+    dragStart = { x: touch.clientX, y: touch.clientY };
+    drawCanvas();
+  }
+}, { passive: false });
+
+canvas.addEventListener("touchend", e => {
+  isDragging = false;
+  if (e.touches.length === 0 && e.changedTouches.length === 1) {
+    const touch = e.changedTouches[0];
+    const rect = canvas.getBoundingClientRect();
+    const x = touch.clientX - rect.left;
+    const y = touch.clientY - rect.top;
+    const [px, py] = getPixelCoords(x, y);
+    const key = `${px},${py}`;
+    if (selectedPixels.has(key)) {
+      selectedPixels.delete(key);
+    } else {
+      selectedPixels.add(key);
+    }
+    updateUI();
+    drawCanvas();
+  }
+}, { passive: false });
+
+function updateUI() {
+  const count = selectedPixels.size;
+  document.getElementById("pixelCount").innerText = count;
+  document.getElementById("totalPrice").innerText = count * pixelPrice;
 }
 
-// Stripe integration
-const stripe = Stripe("pk_test_51RTDqT2c0Glb9QyZNKJzKHIZMfZXmAHBPzFVyxhz22a2cPmsOmzEswfHCYsd68z8HXbeASNV8fI0zoRr3SCSIjTC005jaokCP9");
-
 document.getElementById("payButton").addEventListener("click", async () => {
-  const pixels = selectedPixels.size;
+  const pixelCount = selectedPixels.size;
+  if (pixelCount === 0) return;
 
-  if (pixels === 0) {
-    document.getElementById("errorMessage").textContent = "Please select at least one pixel.";
-    return;
-  }
+  const response = await fetch("/create-checkout-session", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ pixels: pixelCount }),
+  });
 
-  try {
-    const res = await fetch("/create-checkout-session", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ pixels }),
-    });
-
-    const data = await res.json();
-
-    if (data.id) {
-      stripe.redirectToCheckout({ sessionId: data.id });
-    } else {
-      throw new Error(data.error || "Unknown error");
-    }
-  } catch (err) {
-    document.getElementById("errorMessage").textContent = `Payment error: ${err.message}`;
+  const data = await response.json();
+  if (data.id) {
+    const stripe = Stripe("pk_test_51RTDqT2c0Glb9QyZNKJzKHIZMfZXmAHBPzFVyxhz22a2cPmsOmzEswfHCYsd68z8HXbeASNV8fI0zoRr3SCSIjTC005jaokCP9");
+    stripe.redirectToCheckout({ sessionId: data.id });
+  } else {
+    document.getElementById("errorMessage").innerText = data.error;
   }
 });
+
+drawCanvas();
