@@ -13,7 +13,7 @@ function drawGrid() {
     for (let y = 0; y < rows; y++) {
         for (let x = 0; x < cols; x++) {
             const key = `${x},${y}`;
-            ctx.fillStyle = selectedPixels.has(key) ? "blue" : "white";
+            ctx.fillStyle = selectedPixels.has(key) ? "blue" : "gray";
             ctx.fillRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
             ctx.strokeStyle = "#ccc";
             ctx.strokeRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
