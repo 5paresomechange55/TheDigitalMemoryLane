@@ -52,3 +52,26 @@ function togglePixel(e) {
 }
 
 drawGrid();
+
+document.getElementById("payButton").addEventListener("click", async () => {
+    const pixelCount = selectedPixels.size;
+    if (pixelCount === 0) {
+        document.getElementById("errorMessage").textContent = "Please select at least one pixel.";
+        return;
+    }
+
+    const response = await fetch("/create-checkout-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pixels: pixelCount }),
+    });
+
+    const data = await response.json();
+
+    if (data.id) {
+        const stripe = Stripe("pk_test_51RTDqT2c0Glb9QyZNKJzKHIZMfZXmAHBPzFVyxhz22a2cPmsOmzEswfHCYsd68z8HXbeASNV8fI0zoRr3SCSIjTC005jaokCP9");
+        stripe.redirectToCheckout({ sessionId: data.id });
+    } else {
+        document.getElementById("errorMessage").textContent = data.error || "Payment failed.";
+    }
+});
