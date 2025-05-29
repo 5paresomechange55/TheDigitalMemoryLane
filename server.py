@@ -36,8 +36,8 @@ def create_checkout_session():
                 "quantity": data["pixels"],
             }],
             mode="payment",
-            success_url="https://thedigitalmemorylane.onrender.com/success",
-            cancel_url="https://thedigitalmemorylane.onrender.com/cancel",
+            success_url="https://thedigitalmemorylane.onrender.com/success.html",
+            cancel_url="https://thedigitalmemorylane.onrender.com/cancel.html",
         )
         return jsonify({"id": session.id})
     except Exception as e:
