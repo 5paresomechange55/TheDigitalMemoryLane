@@ -146,6 +146,26 @@ canvas.addEventListener("touchend", e => {
   }
 }, { passive: false });
 
+const uploadedImages = []; // to track uploaded overlays
+
+async function loadUploadedImages() {
+  const res = await fetch("/uploaded-images.json");
+  const data = await res.json();
+  for (const { url, x, y, width, height } of data) {
+    const img = new Image();
+    img.src = url;
+    img.onload = () => {
+      uploadedImages.push({ img, x, y, width, height });
+      drawCanvas();
+    };
+  }
+}
+
+// In drawCanvas():
+uploadedImages.forEach(({ img, x, y, width, height }) => {
+  ctx.drawImage(img, x, y, width, height);
+});
+
 // UI updates
 function updateUI() {
   const count = selectedPixels.size;
