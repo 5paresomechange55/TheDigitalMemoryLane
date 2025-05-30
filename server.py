@@ -1,25 +1,50 @@
-from flask import Flask, request, jsonify, render_template, send_from_directory, url_for
-import stripe
+from flask import Flask, request, jsonify, send_from_directory
+from dotenv import load_dotenv
 import os
+import stripe
+import json
 
-app = Flask(__name__)
+# Load environment variables from .env
+load_dotenv()
 
-# Set your Stripe secret key (replace with your actual secret key or use environment variables)
-stripe.api_key = "sk_test_51RTDqT2c0Glb9QyZWKi75aHqXBB44loEfUeZ8rgkyRRM6kkk7WUYf3Nzs1UIYiWt7WACmEX91XyUBWdIjjvNBBDE00g81jY3EP"
+# Initialize Flask app
+app = Flask(__name__, static_folder="public", static_url_path="")
+
+# Stripe configuration from .env
+stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
+PUBLISHABLE_KEY = os.getenv("STRIPE_PUBLISHABLE_KEY")
+
+# Store sold pixels in a simple JSON file (for demo purposes)
+SOLD_PIXELS_FILE = "sold_pixels.json"
+
+# Ensure sold pixels file exists
+if not os.path.exists(SOLD_PIXELS_FILE):
+    with open(SOLD_PIXELS_FILE, "w") as f:
+        json.dump([], f)
 
 @app.route("/")
 def index():
-    return render_template("index.html")
+    return send_from_directory("public", "index.html")
 
 @app.route("/grid.js")
 def grid_js():
-    return send_from_directory(".", "grid.js")
+    return send_from_directory("public", "grid.js")
+
+@app.route("/success")
+def success():
+    return send_from_directory("public", "success.html")
+
+@app.route("/cancel")
+def cancel():
+    return send_from_directory("public", "cancel.html")
 
 @app.route("/create-checkout-session", methods=["POST"])
 def create_checkout_session():
     data = request.get_json()
     pixel_count = data.get("pixels", 0)
-    amount = pixel_count * 100  # convert dollars to cents
+
+    if pixel_count <= 0:
+        return jsonify({"error": "No pixels selected."}), 400
 
     try:
         session = stripe.checkout.Session.create(
@@ -28,27 +53,46 @@ def create_checkout_session():
                 "price_data": {
                     "currency": "usd",
                     "product_data": {
-                        "name": f"{pixel_count} Pixels on The Digital Memory Lane"
+                        "name": "Digital Memory Lane Pixels",
                     },
-                    "unit_amount": amount,
+                    "unit_amount": 100,  # $1.00 per pixel
                 },
-                "quantity": 1,
+                "quantity": pixel_count,
             }],
             mode="payment",
-            success_url=url_for("success", _external=True),
-            cancel_url=url_for("cancel", _external=True),
+            success_url="https://thedigitalmemorylane.com/success",
+            cancel_url="https://thedigitalmemorylane.com/cancel",
         )
-        return jsonify(id=session.id)
+        return jsonify({"id": session.id})
     except Exception as e:
-        return jsonify(error=str(e)), 500
+        return jsonify({"error": str(e)}), 500
 
-@app.route("/success")
-def success():
-    return "<h1 style='color: green; font-family: Courier;'>✅ Payment successful! Your memory is now preserved.</h1>"
+@app.route("/progress")
+def progress():
+    with open(SOLD_PIXELS_FILE, "r") as f:
+        sold = json.load(f)
+    total_pixels = 1000 * 3000
+    return jsonify({
+        "sold": len(sold),
+        "total": total_pixels,
+        "percent": round(100 * len(sold) / total_pixels, 2)
+    })
 
-@app.route("/cancel")
-def cancel():
-    return "<h1 style='color: red; font-family: Courier;'>❌ Payment was canceled. Your memory is not yet saved.</h1>"
+@app.route("/upload-sold", methods=["POST"])
+def upload_sold():
+    data = request.get_json()
+    new_pixels = data.get("pixels", [])
 
+    with open(SOLD_PIXELS_FILE, "r") as f:
+        sold = set(json.load(f))
+
+    sold.update(new_pixels)
+
+    with open(SOLD_PIXELS_FILE, "w") as f:
+        json.dump(list(sold), f)
+
+    return jsonify({"status": "success"})
+
+# Run the app
 if __name__ == "__main__":
     app.run(debug=True)
