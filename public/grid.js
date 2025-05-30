@@ -1,115 +1,171 @@
 const canvas = document.getElementById("pixelCanvas");
 const ctx = canvas.getContext("2d");
-let scale = 1, offsetX = 0, offsetY = 0;
-let selectedPixels = [];
-let actionStack = [];
-const pixelSize = 1;
-const width = 1000, height = 3000;
-canvas.width = width; canvas.height = height;
 
-function drawGrid() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+let scale = 1;
+let originX = 0;
+let originY = 0;
+let isDragging = false;
+let dragStart = { x: 0, y: 0 };
+let selectedPixels = new Set();
+const pixelSize = 1;
+const pixelPrice = 1;
+
+function drawCanvas() {
   ctx.save();
-  ctx.scale(scale, scale);
-  ctx.translate(offsetX, offsetY);
-  for (const [x, y] of selectedPixels) {
-    ctx.fillStyle = "#00FF00";
-    ctx.fillRect(x, y, pixelSize, pixelSize);
-  }
+  ctx.setTransform(scale, 0, 0, scale, originX, originY);
+  ctx.clearRect(-originX / scale, -originY / scale, canvas.width / scale, canvas.height / scale);
+
+  ctx.fillStyle = "#fff8dc";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  selectedPixels.forEach(key => {
+    const [x, y] = key.split(",").map(Number);
+    ctx.fillStyle = "#b5651d"; // nostalgic brown
+    ctx.fillRect(x, y, 1, 1);
+  });
+
   ctx.restore();
 }
 
-canvas.addEventListener("click", (e) => {
-  const rect = canvas.getBoundingClientRect();
-  const x = Math.floor((e.clientX - rect.left) / scale - offsetX);
-  const y = Math.floor((e.clientY - rect.top) / scale - offsetY);
-  const key = selectedPixels.find(([px, py]) => px === x && py === y);
-  if (!key) {
-    selectedPixels.push([x, y]);
-    actionStack.push([x, y]);
-  }
-  drawGrid();
-});
+function getPixelCoords(x, y) {
+  const realX = (x - originX) / scale;
+  const realY = (y - originY) / scale;
+  return [Math.floor(realX), Math.floor(realY)];
+}
 
-let isDragging = false, dragStart = { x: 0, y: 0 };
-canvas.addEventListener("mousedown", (e) => {
+canvas.addEventListener("mousedown", e => {
   isDragging = true;
-  dragStart.x = e.clientX;
-  dragStart.y = e.clientY;
-});
-canvas.addEventListener("mouseup", () => isDragging = false);
-canvas.addEventListener("mousemove", (e) => {
-  if (!isDragging) return;
-  const dx = (e.clientX - dragStart.x) / scale;
-  const dy = (e.clientY - dragStart.y) / scale;
-  offsetX += dx;
-  offsetY += dy;
-  dragStart.x = e.clientX;
-  dragStart.y = e.clientY;
-  drawGrid();
+  dragStart = { x: e.clientX, y: e.clientY };
 });
 
-canvas.addEventListener("wheel", (e) => {
+canvas.addEventListener("mousemove", e => {
+  if (isDragging) {
+    originX += e.clientX - dragStart.x;
+    originY += e.clientY - dragStart.y;
+    dragStart = { x: e.clientX, y: e.clientY };
+    drawCanvas();
+  }
+});
+
+canvas.addEventListener("mouseup", () => {
+  isDragging = false;
+});
+
+canvas.addEventListener("wheel", e => {
   e.preventDefault();
-  const delta = e.deltaY < 0 ? 1.1 : 0.9;
-  scale *= delta;
-  drawGrid();
+  const zoomFactor = 1.1;
+  const zoom = e.deltaY < 0 ? zoomFactor : 1 / zoomFactor;
+  const mouseX = e.offsetX;
+  const mouseY = e.offsetY;
+
+  originX = mouseX - (mouseX - originX) * zoom;
+  originY = mouseY - (mouseY - originY) * zoom;
+  scale *= zoom;
+  drawCanvas();
+}, { passive: false });
+
+canvas.addEventListener("click", e => {
+  const [x, y] = getPixelCoords(e.offsetX, e.offsetY);
+  const key = `${x},${y}`;
+  if (selectedPixels.has(key)) {
+    selectedPixels.delete(key);
+  } else {
+    selectedPixels.add(key);
+  }
+  updateUI();
+  drawCanvas();
 });
 
-let lastTouchDistance = null;
-canvas.addEventListener("touchstart", (e) => {
+// Mobile touch support
+let lastTouchDist = 0;
+let lastTouchCenter = null;
+
+canvas.addEventListener("touchstart", e => {
   if (e.touches.length === 2) {
     const dx = e.touches[0].clientX - e.touches[1].clientX;
     const dy = e.touches[0].clientY - e.touches[1].clientY;
-    lastTouchDistance = Math.sqrt(dx * dx + dy * dy);
-  }
-});
-canvas.addEventListener("touchmove", (e) => {
-  e.preventDefault();
-  if (e.touches.length === 2 && lastTouchDistance !== null) {
-    const dx = e.touches[0].clientX - e.touches[1].clientX;
-    const dy = e.touches[0].clientY - e.touches[1].clientY;
-    const newDistance = Math.sqrt(dx * dx + dy * dy);
-    const scaleFactor = newDistance / lastTouchDistance;
-    scale *= scaleFactor;
-    lastTouchDistance = newDistance;
-    drawGrid();
+    lastTouchDist = Math.hypot(dx, dy);
+    lastTouchCenter = {
+      x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+      y: (e.touches[0].clientY + e.touches[1].clientY) / 2
+    };
+  } else if (e.touches.length === 1) {
+    isDragging = true;
+    dragStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
   }
 }, { passive: false });
 
-document.getElementById("undoBtn").addEventListener("click", () => {
-  const last = actionStack.pop();
-  if (last) selectedPixels = selectedPixels.filter(p => !(p[0] === last[0] && p[1] === last[1]));
-  drawGrid();
-});
+canvas.addEventListener("touchmove", e => {
+  e.preventDefault();
+  if (e.touches.length === 2) {
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    const newDist = Math.hypot(dx, dy);
+    const newCenter = {
+      x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+      y: (e.touches[0].clientY + e.touches[1].clientY) / 2
+    };
 
-document.getElementById("deselectAllBtn").addEventListener("click", () => {
-  selectedPixels = [];
-  actionStack = [];
-  drawGrid();
-});
+    const zoom = newDist / lastTouchDist;
+    originX = newCenter.x - (newCenter.x - originX) * zoom;
+    originY = newCenter.y - (newCenter.y - originY) * zoom;
+    scale *= zoom;
 
-document.getElementById("checkoutBtn").addEventListener("click", async () => {
-  const res = await fetch("/create-checkout-session", {
+    lastTouchDist = newDist;
+    lastTouchCenter = newCenter;
+    drawCanvas();
+  } else if (e.touches.length === 1 && isDragging) {
+    const touch = e.touches[0];
+    originX += touch.clientX - dragStart.x;
+    originY += touch.clientY - dragStart.y;
+    dragStart = { x: touch.clientX, y: touch.clientY };
+    drawCanvas();
+  }
+}, { passive: false });
+
+canvas.addEventListener("touchend", e => {
+  isDragging = false;
+  if (e.touches.length === 0 && e.changedTouches.length === 1) {
+    const touch = e.changedTouches[0];
+    const rect = canvas.getBoundingClientRect();
+    const x = touch.clientX - rect.left;
+    const y = touch.clientY - rect.top;
+    const [px, py] = getPixelCoords(x, y);
+    const key = `${px},${py}`;
+    if (selectedPixels.has(key)) {
+      selectedPixels.delete(key);
+    } else {
+      selectedPixels.add(key);
+    }
+    updateUI();
+    drawCanvas();
+  }
+}, { passive: false });
+
+function updateUI() {
+  const count = selectedPixels.size;
+  document.getElementById("pixelCount").innerText = count;
+  document.getElementById("totalPrice").innerText = count * pixelPrice;
+}
+
+document.getElementById("payButton").addEventListener("click", async () => {
+  const pixelCount = selectedPixels.size;
+  if (pixelCount === 0) return;
+
+  const response = await fetch("/create-checkout-session", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ pixels: selectedPixels.length }),
+    body: JSON.stringify({ pixels: pixelCount }),
   });
-  const data = await res.json();
+
+  const data = await response.json();
   if (data.id) {
-    const stripe = Stripe("pk_test_1234567890"); // replace with real key
+    const stripe = Stripe("pk_test_51RTDqT2c0Glb9QyZNKJzKHIZMfZXmAHBPzFVyxhz22a2cPmsOmzEswfHCYsd68z8HXbeASNV8fI0zoRr3SCSIjTC005jaokCP9");
     stripe.redirectToCheckout({ sessionId: data.id });
+  } else {
+    document.getElementById("errorMessage").innerText = data.error;
   }
 });
 
-fetch("/pixel-stats")
-  .then(res => res.json())
-  .then(data => {
-    const total = 1000 * 3000;
-    const percent = ((data.sold / total) * 100).toFixed(2);
-    document.getElementById("pixel-counter").innerText = `${data.sold} pixels sold (${percent}%)`;
-    document.getElementById("pixel-progress").style.width = percent + "%";
-  });
-
-drawGrid();
+drawCanvas();
 
