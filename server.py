@@ -1,28 +1,25 @@
-from flask import Flask, request, send_from_directory, jsonify
+rom flask import Flask, request, send_from_directory, jsonify
 import os
 import stripe
 import json
 
 app = Flask(__name__, static_folder="public", static_url_path="")
-
 stripe.api_key = os.environ.get("STRIPE_SECRET_KEY")
 
 PIXEL_DATA_FILE = "pixel_data.json"
 
-# Ensure the data file exists
 if not os.path.exists(PIXEL_DATA_FILE):
     with open(PIXEL_DATA_FILE, "w") as f:
         json.dump({"sold_pixels": 0}, f)
 
 def get_sold_pixel_count():
     with open(PIXEL_DATA_FILE, "r") as f:
-        data = json.load(f)
-    return data["sold_pixels"]
+        return json.load(f)["sold_pixels"]
 
 def update_sold_pixel_count(new_pixels):
-    data = {"sold_pixels": get_sold_pixel_count() + new_pixels}
+    count = get_sold_pixel_count()
     with open(PIXEL_DATA_FILE, "w") as f:
-        json.dump(data, f)
+        json.dump({"sold_pixels": count + new_pixels}, f)
 
 @app.route("/")
 def index():
@@ -36,32 +33,28 @@ def serve_static(path):
 def create_checkout_session():
     data = request.get_json()
     try:
-        pixels = data["pixels"]
         session = stripe.checkout.Session.create(
             payment_method_types=["card"],
             line_items=[{
                 "price_data": {
                     "currency": "usd",
                     "product_data": {"name": "Pixel Space"},
-                    "unit_amount": 100,  # $1 per pixel
+                    "unit_amount": 100,
                 },
-                "quantity": pixels,
+                "quantity": data["pixels"],
             }],
             mode="payment",
             success_url="https://thedigitalmemorylane.com/success",
             cancel_url="https://thedigitalmemorylane.com/cancel",
-            metadata={"pixels_purchased": pixels}
         )
-        # Preemptively update pixel count
-        update_sold_pixel_count(pixels)
+        update_sold_pixel_count(data["pixels"])
         return jsonify({"id": session.id})
     except Exception as e:
         return jsonify(error=str(e)), 403
 
 @app.route("/pixel-stats", methods=["GET"])
 def pixel_stats():
-    sold_pixels = get_sold_pixel_count()
-    return jsonify({"sold": sold_pixels})
+    return jsonify({"sold": get_sold_pixel_count()})
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)))
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
