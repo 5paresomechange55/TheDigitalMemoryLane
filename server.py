@@ -1,25 +1,9 @@
-rom flask import Flask, request, send_from_directory, jsonify
+from flask import Flask, request, send_from_directory, jsonify
 import os
 import stripe
-import json
 
 app = Flask(__name__, static_folder="public", static_url_path="")
 stripe.api_key = os.environ.get("STRIPE_SECRET_KEY")
-
-PIXEL_DATA_FILE = "pixel_data.json"
-
-if not os.path.exists(PIXEL_DATA_FILE):
-    with open(PIXEL_DATA_FILE, "w") as f:
-        json.dump({"sold_pixels": 0}, f)
-
-def get_sold_pixel_count():
-    with open(PIXEL_DATA_FILE, "r") as f:
-        return json.load(f)["sold_pixels"]
-
-def update_sold_pixel_count(new_pixels):
-    count = get_sold_pixel_count()
-    with open(PIXEL_DATA_FILE, "w") as f:
-        json.dump({"sold_pixels": count + new_pixels}, f)
 
 @app.route("/")
 def index():
@@ -39,22 +23,17 @@ def create_checkout_session():
                 "price_data": {
                     "currency": "usd",
                     "product_data": {"name": "Pixel Space"},
-                    "unit_amount": 100,
+                    "unit_amount": 100,  # $1 per pixel
                 },
                 "quantity": data["pixels"],
             }],
             mode="payment",
-            success_url="https://thedigitalmemorylane.com/success",
-            cancel_url="https://thedigitalmemorylane.com/cancel",
+            success_url="https://yourdomain.com/success.html",
+            cancel_url="https://yourdomain.com/cancel.html",
         )
-        update_sold_pixel_count(data["pixels"])
         return jsonify({"id": session.id})
     except Exception as e:
         return jsonify(error=str(e)), 403
-
-@app.route("/pixel-stats", methods=["GET"])
-def pixel_stats():
-    return jsonify({"sold": get_sold_pixel_count()})
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
