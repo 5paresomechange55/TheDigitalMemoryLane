@@ -1,98 +1,52 @@
-from flask import Flask, request, jsonify, send_from_directory
-from dotenv import load_dotenv
+from flask import Flask, request, render_template, jsonify, redirect
 import os
+from dotenv import load_dotenv
 import stripe
-import json
+from PIL import Image
+import io
+from werkzeug.utils import secure_filename
 
-# Load environment variables from .env
 load_dotenv()
 
-# Initialize Flask app
-app = Flask(__name__, static_folder="public", static_url_path="")
+app = Flask(__name__)
+app.config["UPLOAD_FOLDER"] = "uploads"
+os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
 
-# Stripe configuration from .env
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
-PUBLISHABLE_KEY = os.getenv("STRIPE_PUBLISHABLE_KEY")
 
-# Store sold pixels in a simple JSON file (for demo purposes)
-SOLD_PIXELS_FILE = "sold_pixels.json"
-
-# Ensure sold pixels file exists
-if not os.path.exists(SOLD_PIXELS_FILE):
-    with open(SOLD_PIXELS_FILE, "w") as f:
-        json.dump([], f)
-
-@app.route("/")
-def index():
-    return send_from_directory("public", "index.html")
-
-@app.route("/grid.js")
-def grid_js():
-    return send_from_directory("public", "grid.js")
+# Existing route remains intact...
 
 @app.route("/success")
 def success():
-    return send_from_directory("public", "success.html")
+    session_id = request.args.get("session_id")
+    return redirect(f"/upload.html?session_id={session_id}")
 
-@app.route("/cancel")
-def cancel():
-    return send_from_directory("public", "cancel.html")
+@app.route("/upload", methods=["POST"])
+def upload_image():
+    session_id = request.form.get("session_id")
+    file = request.files.get("image")
 
-@app.route("/create-checkout-session", methods=["POST"])
-def create_checkout_session():
-    data = request.get_json()
-    pixel_count = data.get("pixels", 0)
-
-    if pixel_count <= 0:
-        return jsonify({"error": "No pixels selected."}), 400
+    if not session_id or not file:
+        return jsonify({"message": "Session ID or image missing."}), 400
 
     try:
-        session = stripe.checkout.Session.create(
-            payment_method_types=["card"],
-            line_items=[{
-                "price_data": {
-                    "currency": "usd",
-                    "product_data": {
-                        "name": "Digital Memory Lane Pixels",
-                    },
-                    "unit_amount": 100,  # $1.00 per pixel
-                },
-                "quantity": pixel_count,
-            }],
-            mode="payment",
-            success_url="https://thedigitalmemorylane.com/success",
-            cancel_url="https://thedigitalmemorylane.com/cancel",
-        )
-        return jsonify({"id": session.id})
+        session = stripe.checkout.Session.retrieve(session_id)
+        if session.payment_status != "paid":
+            return jsonify({"message": "Payment not verified."}), 403
+
+        filename = secure_filename(session_id + ".jpg")
+        image = Image.open(file.stream)
+        image = image.convert("RGB")
+        image.thumbnail((500, 500))  # Resize for reasonable storage
+
+        image_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+        image.save(image_path)
+
+        return jsonify({"message": "Image uploaded successfully."})
+
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"message": f"Upload failed: {str(e)}"}), 500
 
-@app.route("/progress")
-def progress():
-    with open(SOLD_PIXELS_FILE, "r") as f:
-        sold = json.load(f)
-    total_pixels = 1000 * 3000
-    return jsonify({
-        "sold": len(sold),
-        "total": total_pixels,
-        "percent": round(100 * len(sold) / total_pixels, 2)
-    })
-
-@app.route("/upload-sold", methods=["POST"])
-def upload_sold():
-    data = request.get_json()
-    new_pixels = data.get("pixels", [])
-
-    with open(SOLD_PIXELS_FILE, "r") as f:
-        sold = set(json.load(f))
-
-    sold.update(new_pixels)
-
-    with open(SOLD_PIXELS_FILE, "w") as f:
-        json.dump(list(sold), f)
-
-    return jsonify({"status": "success"})
-
-# Run the app
-if __name__ == "__main__":
-    app.run(debug=True)
+@app.route("/uploads/<filename>")
+def serve_uploaded_image(filename):
+    return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
