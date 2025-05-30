@@ -2,178 +2,52 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>The Digital Memory Lane</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://js.stripe.com/v3/"></script>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <style>
     body {
-      background: linear-gradient(135deg, #f5f7fa, #c3cfe2);
-      font-family: 'Courier New', Courier, monospace;
+      font-family: 'Courier New', monospace;
+      background-color: #fef3c7;
+      color: #1f2937;
     }
-
-<div class="w-full max-w-xl mx-auto text-center my-6">
-  <div id="pixel-counter" class="text-lg font-bold text-yellow-400 mb-2">
-    Loading pixel data...
-  </div>
-  <div class="w-full bg-gray-700 rounded-full h-4">
-    <div id="pixel-progress" class="bg-yellow-400 h-4 rounded-full" style="width: 0%;"></div>
-  </div>
-</div>
-    
     canvas {
-      background-color: #fff8dc;
-      border: 2px dashed #888;
+      border: 2px solid #000;
+      background-color: #fff;
       touch-action: none;
     }
-
-    .btn {
-      @apply px-4 py-2 rounded shadow text-white bg-blue-700 hover:bg-blue-900;
-    }
-
-    .btn-red {
-      @apply bg-red-600 hover:bg-red-800;
-    }
-
-    .btn-yellow {
-      @apply bg-yellow-600 hover:bg-yellow-700 text-black;
+    .button {
+      @apply bg-yellow-400 hover:bg-yellow-300 text-black font-bold py-2 px-4 rounded transition;
     }
   </style>
 </head>
-<body class="flex flex-col items-center p-6 space-y-6">
-  <header class="text-center">
-    <h1 class="text-4xl font-bold text-blue-900 drop-shadow">🧠 The Digital Memory Lane 📸</h1>
-    <p class="mt-2 text-lg text-gray-700 max-w-xl mx-auto">
-      Immortalize your pixel in internet history – $1 per pixel. Select your spot, make a mark forever.
-    </p>
-  </header>
+<body class="flex flex-col items-center p-4 space-y-4">
 
-  <div class="flex flex-col items-center space-y-2">
-    <canvas id="pixelCanvas" width="1000" height="3000" class="w-full max-w-full touch-none"></canvas>
+  <h1 class="text-4xl font-bold text-center">🧠 The Digital Memory Lane 📸</h1>
+  <p class="text-center max-w-xl">Immortalize your presence on the internet. Buy pixels, upload an image, and be part of digital history forever.</p>
 
-    <div class="flex space-x-3 mt-2">
-      <button id="undoBtn" class="btn btn-yellow">Undo</button>
-      <button id="deselectAllBtn" class="btn btn-red">Deselect All</button>
-      <button id="checkoutBtn" class="btn">Checkout</button>
+  <div class="flex flex-col items-center w-full space-y-4">
+    <canvas id="pixelCanvas" width="1000" height="3000" class="w-full max-w-3xl"></canvas>
+
+    <div class="flex space-x-4">
+      <button id="undoBtn" class="button">Undo</button>
+      <button id="clearBtn" class="button">Deselect All</button>
+      <button id="checkoutBtn" class="button bg-green-500 hover:bg-green-400">Buy Selected Pixels</button>
     </div>
 
-    <p id="totalPrice" class="mt-2 text-lg font-semibold text-gray-800">Total: $0</p>
+    <div class="w-full max-w-xl mt-6">
+      <div class="text-sm mb-1 text-center">Progress: <span id="progressText">0%</span> pixels sold</div>
+      <div class="w-full bg-gray-300 rounded-full h-4">
+        <div id="progressBar" class="bg-green-500 h-4 rounded-full" style="width: 0%"></div>
+      </div>
+    </div>
   </div>
 
-  <footer class="mt-10 text-sm text-gray-500">
-    &copy; 2025 TheDigitalMemoryLane.com. Your memory lives here.
+  <footer class="text-sm mt-8 text-center">
+    &copy; 2025 TheDigitalMemoryLane.com | $1 per pixel | Nostalgia meets eternity
   </footer>
 
-  <script>
-    const canvas = document.getElementById("pixelCanvas");
-    const ctx = canvas.getContext("2d");
-    const selectedPixels = new Set();
-    const pixelSize = 1;
-    const undoStack = [];
-
-    let scale = 1;
-    let originX = 0;
-    let originY = 0;
-    let isDragging = false;
-    let dragStart = { x: 0, y: 0 };
-
-    canvas.addEventListener("mousedown", (e) => {
-      isDragging = true;
-      dragStart.x = e.offsetX;
-      dragStart.y = e.offsetY;
-    });
-
-    canvas.addEventListener("mousemove", (e) => {
-      if (!isDragging) return;
-      const dx = e.offsetX - dragStart.x;
-      const dy = e.offsetY - dragStart.y;
-      originX += dx;
-      originY += dy;
-      dragStart = { x: e.offsetX, y: e.offsetY };
-      drawCanvas();
-    });
-
-    canvas.addEventListener("mouseup", () => {
-      isDragging = false;
-    });
-
-    canvas.addEventListener("wheel", (e) => {
-      e.preventDefault();
-      const zoom = e.deltaY < 0 ? 1.1 : 0.9;
-      scale *= zoom;
-      drawCanvas();
-    });
-
-    canvas.addEventListener("click", (e) => {
-      if (isDragging) return;
-
-      const x = Math.floor((e.offsetX - originX) / scale);
-      const y = Math.floor((e.offsetY - originY) / scale);
-      const key = `${x},${y}`;
-
-      if (selectedPixels.has(key)) {
-        selectedPixels.delete(key);
-      } else {
-        selectedPixels.add(key);
-        undoStack.push(key);
-      }
-
-      drawCanvas();
-      updateTotal();
-    });
-
-    document.getElementById("undoBtn").addEventListener("click", () => {
-      const last = undoStack.pop();
-      if (last) selectedPixels.delete(last);
-      drawCanvas();
-      updateTotal();
-    });
-
-    document.getElementById("deselectAllBtn").addEventListener("click", () => {
-      selectedPixels.clear();
-      undoStack.length = 0;
-      drawCanvas();
-      updateTotal();
-    });
-
-    document.getElementById("checkoutBtn").addEventListener("click", async () => {
-      const pixels = selectedPixels.size;
-      if (pixels === 0) {
-        alert("Please select at least one pixel.");
-        return;
-      }
-
-      const res = await fetch("/create-checkout-session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pixels }),
-      });
-
-      const { id } = await res.json();
-      const stripe = Stripe("pk_test_51RTDqT2c0Glb9QyZNKJzKHIZMfZXmAHBPzFVyxhz22a2cPmsOmzEswfHCYsd68z8HXbeASNV8fI0zoRr3SCSIjTC005jaokCP9");
-      stripe.redirectToCheckout({ sessionId: id });
-    });
-
-    function updateTotal() {
-      document.getElementById("totalPrice").textContent = `Total: $${selectedPixels.size}`;
-    }
-
-    function drawCanvas() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.save();
-      ctx.translate(originX, originY);
-      ctx.scale(scale, scale);
-
-      for (let pixel of selectedPixels) {
-        const [x, y] = pixel.split(",").map(Number);
-        ctx.fillStyle = "#ff69b4"; // nostalgic hot pink
-        ctx.fillRect(x, y, pixelSize, pixelSize);
-      }
-
-      ctx.restore();
-    }
-
-    drawCanvas();
-  </script>
+  <script src="https://js.stripe.com/v3/"></script>
+  <script src="grid.js"></script>
 </body>
 </html>
