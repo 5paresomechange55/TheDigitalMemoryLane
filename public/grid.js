@@ -43,6 +43,19 @@ function getPixelCoordinates(clientX, clientY) {
     return `${x},${y}`;
 }
 
+function updatePixelProgress(sold) {
+  const total = 1000 * 3000;
+  const percent = ((sold / total) * 100).toFixed(2);
+  document.getElementById("pixel-counter").innerText = `${sold} pixels sold (${percent}% filled)`;
+  document.getElementById("pixel-progress").style.width = `${percent}%`;
+}
+
+// Load stats when page loads
+fetch("/pixel-stats")
+  .then(res => res.json())
+  .then(data => updatePixelProgress(data.sold))
+  .catch(err => console.error("Failed to load pixel stats:", err));
+
 // Mouse Controls
 canvas.addEventListener("mousedown", (e) => {
     isDragging = true;
