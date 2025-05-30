@@ -1,39 +1,54 @@
-from flask import Flask, request, send_from_directory, jsonify
-import os
+from flask import Flask, request, jsonify, render_template, send_from_directory, url_for
 import stripe
+import os
 
-app = Flask(__name__, static_folder="public", static_url_path="")
-stripe.api_key = os.environ.get("STRIPE_SECRET_KEY")
+app = Flask(__name__)
+
+# Set your Stripe secret key (replace with your actual secret key or use environment variables)
+stripe.api_key = "sk_test_51RTDqT2c0Glb9QyZWKi75aHqXBB44loEfUeZ8rgkyRRM6kkk7WUYf3Nzs1UIYiWt7WACmEX91XyUBWdIjjvNBBDE00g81jY3EP"
 
 @app.route("/")
 def index():
-    return send_from_directory("public", "index.html")
+    return render_template("index.html")
 
-@app.route("/public/<path:path>")
-def serve_static(path):
-    return send_from_directory("public", path)
+@app.route("/grid.js")
+def grid_js():
+    return send_from_directory(".", "grid.js")
 
 @app.route("/create-checkout-session", methods=["POST"])
 def create_checkout_session():
     data = request.get_json()
+    pixel_count = data.get("pixels", 0)
+    amount = pixel_count * 100  # convert dollars to cents
+
     try:
         session = stripe.checkout.Session.create(
             payment_method_types=["card"],
             line_items=[{
                 "price_data": {
                     "currency": "usd",
-                    "product_data": {"name": "Pixel Space"},
-                    "unit_amount": 100,  # $1 per pixel
+                    "product_data": {
+                        "name": f"{pixel_count} Pixels on The Digital Memory Lane"
+                    },
+                    "unit_amount": amount,
                 },
-                "quantity": data["pixels"],
+                "quantity": 1,
             }],
             mode="payment",
-            success_url="https://yourdomain.com/success.html",
-            cancel_url="https://yourdomain.com/cancel.html",
+            success_url=url_for("success", _external=True),
+            cancel_url=url_for("cancel", _external=True),
         )
-        return jsonify({"id": session.id})
+        return jsonify(id=session.id)
     except Exception as e:
-        return jsonify(error=str(e)), 403
+        return jsonify(error=str(e)), 500
+
+@app.route("/success")
+def success():
+    return "<h1 style='color: green; font-family: Courier;'>✅ Payment successful! Your memory is now preserved.</h1>"
+
+@app.route("/cancel")
+def cancel():
+    return "<h1 style='color: red; font-family: Courier;'>❌ Payment was canceled. Your memory is not yet saved.</h1>"
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+    app.run(debug=True)
