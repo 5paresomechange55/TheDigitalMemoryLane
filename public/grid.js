@@ -7,6 +7,8 @@ let originY = 0;
 let isDragging = false;
 let dragStart = { x: 0, y: 0 };
 let selectedPixels = new Set();
+let selectionHistory = [];
+
 const pixelSize = 1;
 const pixelPrice = 1;
 
@@ -14,13 +16,12 @@ function drawCanvas() {
   ctx.save();
   ctx.setTransform(scale, 0, 0, scale, originX, originY);
   ctx.clearRect(-originX / scale, -originY / scale, canvas.width / scale, canvas.height / scale);
-
   ctx.fillStyle = "#fff8dc";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   selectedPixels.forEach(key => {
     const [x, y] = key.split(",").map(Number);
-    ctx.fillStyle = "#b5651d"; // nostalgic brown
+    ctx.fillStyle = "#b5651d";
     ctx.fillRect(x, y, 1, 1);
   });
 
@@ -33,6 +34,7 @@ function getPixelCoords(x, y) {
   return [Math.floor(realX), Math.floor(realY)];
 }
 
+// Mouse interaction
 canvas.addEventListener("mousedown", e => {
   isDragging = true;
   dragStart = { x: e.clientX, y: e.clientY };
@@ -71,12 +73,13 @@ canvas.addEventListener("click", e => {
     selectedPixels.delete(key);
   } else {
     selectedPixels.add(key);
+    selectionHistory.push(key);
   }
   updateUI();
   drawCanvas();
 });
 
-// Mobile touch support
+// Touch interaction
 let lastTouchDist = 0;
 let lastTouchCenter = null;
 
@@ -136,12 +139,14 @@ canvas.addEventListener("touchend", e => {
       selectedPixels.delete(key);
     } else {
       selectedPixels.add(key);
+      selectionHistory.push(key);
     }
     updateUI();
     drawCanvas();
   }
 }, { passive: false });
 
+// UI updates
 function updateUI() {
   const count = selectedPixels.size;
   document.getElementById("pixelCount").innerText = count;
@@ -165,6 +170,24 @@ document.getElementById("payButton").addEventListener("click", async () => {
   } else {
     document.getElementById("errorMessage").innerText = data.error;
   }
+});
+
+// Undo button
+document.getElementById("undoButton").addEventListener("click", () => {
+  const last = selectionHistory.pop();
+  if (last) {
+    selectedPixels.delete(last);
+    updateUI();
+    drawCanvas();
+  }
+});
+
+// Deselect all button
+document.getElementById("deselectButton").addEventListener("click", () => {
+  selectedPixels.clear();
+  selectionHistory = [];
+  updateUI();
+  drawCanvas();
 });
 
 drawCanvas();
