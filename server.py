@@ -1,160 +1,131 @@
-let canvas = document.getElementById("pixelCanvas");
-let ctx = canvas.getContext("2d");
-let scale = 1;
-let offsetX = 0;
-let offsetY = 0;
-let isDragging = false;
-let startX, startY;
-let selectedPixels = new Set();
-let claimedPixels = new Set(); // Claimed pixels from server
-const pricePerPixel = 1;
+import os
+import json
+from flask import Flask, render_template, request, jsonify, redirect, url_for
+from flask_cors import CORS
+from werkzeug.utils import secure_filename
+from PIL import Image
+from dotenv import load_dotenv
+import stripe
 
-// Load claimed pixels from server
-fetch("/claimed_pixels")
-  .then(res => res.json())
-  .then(data => {
-    data.claimed.forEach(p => claimedPixels.add(p));
-    drawCanvas();
-    updatePixelTracker(); // Initialize pixel tracker
-  });
+# Load environment variables
+load_dotenv()
+stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 
-canvas.addEventListener("mousedown", (e) => {
-  isDragging = true;
-  startX = e.clientX - offsetX;
-  startY = e.clientY - offsetY;
-});
+app = Flask(__name__)
+CORS(app)
 
-canvas.addEventListener("mouseup", () => isDragging = false);
-canvas.addEventListener("mouseout", () => isDragging = false);
+# File paths
+PIXELS_FILE = 'data/claimed_pixels.json'
+UPLOAD_FOLDER = 'static/uploads'
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-canvas.addEventListener("mousemove", (e) => {
-  if (isDragging) {
-    offsetX = e.clientX - startX;
-    offsetY = e.clientY - startY;
-    drawCanvas();
-  }
-});
+# Ensure folders exist
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+os.makedirs('data', exist_ok=True)
 
-canvas.addEventListener("wheel", (e) => {
-  e.preventDefault();
-  const zoom = e.deltaY < 0 ? 1.1 : 0.9;
-  scale *= zoom;
-  drawCanvas();
-});
+# Load claimed pixels
+if os.path.exists(PIXELS_FILE):
+    with open(PIXELS_FILE, 'r') as f:
+        claimed_pixels = json.load(f)
+else:
+    claimed_pixels = {}
 
-canvas.addEventListener("click", (e) => {
-  const rect = canvas.getBoundingClientRect();
-  const x = Math.floor((e.clientX - rect.left - offsetX) / scale);
-  const y = Math.floor((e.clientY - rect.top - offsetY) / scale);
-  const key = `${x},${y}`;
+@app.route('/')
+def index():
+    return render_template('index.html')
 
-  if (claimedPixels.has(key)) return;
+@app.route('/about')
+def about():
+    return render_template('about.html')
 
-  if (selectedPixels.has(key)) {
-    selectedPixels.delete(key);
-  } else {
-    selectedPixels.add(key);
-  }
+@app.route('/contact')
+def contact():
+    return render_template('contact.html')
 
-  updatePriceDisplay();
-  updatePixelTracker();
-  drawCanvas();
-});
+@app.route('/get-claimed-pixels')
+def get_claimed_pixels():
+    return jsonify(claimed_pixels)
 
-// Touch support for mobile devices
-canvas.addEventListener("touchstart", (e) => {
-  if (e.touches.length === 1) {
-    isDragging = true;
-    startX = e.touches[0].clientX - offsetX;
-    startY = e.touches[0].clientY - offsetY;
-  }
-}, { passive: false });
+@app.route('/create-checkout-session', methods=['POST'])
+def create_checkout_session():
+    data = request.get_json()
+    selected_pixels = data.get('pixels', [])
 
-canvas.addEventListener("touchmove", (e) => {
-  if (isDragging && e.touches.length === 1) {
-    offsetX = e.touches[0].clientX - startX;
-    offsetY = e.touches[0].clientY - startY;
-    drawCanvas();
-  }
-}, { passive: false });
+    if not selected_pixels:
+        return jsonify({'error': 'No pixels selected'}), 400
 
-canvas.addEventListener("touchend", () => {
-  isDragging = false;
-});
+    # Store selected pixels in a temporary session file
+    session_id = f"session_{os.urandom(8).hex()}"
+    with open(f"data/{session_id}.json", 'w') as f:
+        json.dump(selected_pixels, f)
 
-function drawCanvas() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.save();
-  ctx.translate(offsetX, offsetY);
-  ctx.scale(scale, scale);
+    try:
+        session = stripe.checkout.Session.create(
+            payment_method_types=['card'],
+            line_items=[{
+                'price_data': {
+                    'currency': 'usd',
+                    'product_data': {
+                        'name': 'Digital Memory Lane Pixels',
+                    },
+                    'unit_amount': 100,  # $1 per pixel
+                },
+                'quantity': len(selected_pixels),
+            }],
+            mode='payment',
+            success_url=url_for('upload', session_id=session_id, _external=True),
+            cancel_url=url_for('index', _external=True),
+        )
+        return jsonify({'id': session.id})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
-  for (let x = 0; x < canvas.width; x++) {
-    for (let y = 0; y < canvas.height; y++) {
-      const key = `${x},${y}`;
-      if (claimedPixels.has(key)) {
-        ctx.fillStyle = "gray";
-      } else if (selectedPixels.has(key)) {
-        ctx.fillStyle = "gold";
-      } else {
-        ctx.fillStyle = "white";
-      }
-      ctx.fillRect(x, y, 1, 1);
-    }
-  }
+@app.route('/upload/<session_id>', methods=['GET', 'POST'])
+def upload(session_id):
+    pixel_file = f"data/{session_id}.json"
 
-  ctx.restore();
-}
+    if not os.path.exists(pixel_file):
+        return "Invalid session", 400
 
-function updatePriceDisplay() {
-  const count = selectedPixels.size;
-  document.getElementById("pixelCount").innerText = count;
-  document.getElementById("totalPrice").innerText = count * pricePerPixel;
-}
+    if request.method == 'POST':
+        if 'image' not in request.files:
+            return "No image uploaded", 400
 
-function updatePixelTracker() {
-  const totalPixels = canvas.width * canvas.height;
-  const claimedCount = claimedPixels.size;
-  const selectedCount = selectedPixels.size;
-  const totalClaimed = claimedCount + selectedCount;
+        image = request.files['image']
+        if image.filename == '':
+            return "No selected file", 400
 
-  const percent = ((totalClaimed / totalPixels) * 100).toFixed(2);
-  const tracker = document.getElementById("pixelTracker");
+        if image and allowed_file(image.filename):
+            filename = secure_filename(image.filename)
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            image.save(filepath)
 
-  if (tracker) {
-    tracker.innerText = `Pixels claimed: ${totalClaimed} / ${totalPixels} (${percent}%)`;
-  }
-}
+            # Resize image to fit selected pixels
+            with open(pixel_file, 'r') as f:
+                selected_pixels = json.load(f)
 
-// Stripe payment
-document.getElementById("payButton").addEventListener("click", () => {
-  if (selectedPixels.size === 0) return;
+            width = max(p[0] for p in selected_pixels) - min(p[0] for p in selected_pixels) + 1
+            height = max(p[1] for p in selected_pixels) - min(p[1] for p in selected_pixels) + 1
 
-  fetch("/create-checkout-session", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ pixels: Array.from(selectedPixels) }),
-  })
-    .then(res => res.json())
-    .then(data => {
-      return Stripe(data.publicKey).redirectToCheckout({ sessionId: data.sessionId });
-    })
-    .catch(err => {
-      document.getElementById("errorMessage").innerText = "Payment failed. Try again.";
-      console.error(err);
-    });
-});
+            img = Image.open(filepath)
+            img = img.resize((width, height))
+            img.save(filepath, optimize=True, quality=85)
 
-// Undo and deselect buttons
-document.getElementById("undoButton")?.addEventListener("click", () => {
-  selectedPixels.clear();
-  updatePriceDisplay();
-  updatePixelTracker();
-  drawCanvas();
-});
+            # Mark pixels as claimed
+            for pixel in selected_pixels:
+                claimed_pixels[str(pixel)] = filename
 
-document.getElementById("deselectAllButton")?.addEventListener("click", () => {
-  selectedPixels.clear();
-  updatePriceDisplay();
-  updatePixelTracker();
-  drawCanvas();
-});
+            with open(PIXELS_FILE, 'w') as f:
+                json.dump(claimed_pixels, f)
+
+            os.remove(pixel_file)  # Cleanup session data
+            return redirect(url_for('index'))
+
+    return render_template('upload.html', session_id=session_id)
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+if __name__ == '__main__':
+    app.run(debug=True)
