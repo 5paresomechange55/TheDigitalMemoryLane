@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en" class="bg-gradient-to-br from-yellow-100 via-pink-100 to-blue-100 min-h-screen text-gray-800">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Upload Your Memory | The Digital Memory Lane</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@3.4.1/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="font-mono">
+
+  <!-- Navigation -->
+  <header class="bg-white shadow-md p-4 sticky top-0 z-50">
+    <nav class="container mx-auto flex justify-between items-center">
+      <h1 class="text-xl font-bold text-pink-600">The Digital Memory Lane</h1>
+      <ul class="flex space-x-6">
+        <li><a href="/" class="text-blue-600 hover:underline">Home</a></li>
+        <li><a href="/about" class="text-blue-600 hover:underline">About Us</a></li>
+        <li><a href="/contact" class="text-blue-600 hover:underline">Contact Us</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <!-- Upload Section -->
+  <main class="container mx-auto mt-10 p-6 bg-white shadow-md rounded-lg max-w-xl text-center">
+    <h2 class="text-2xl font-semibold mb-4 text-pink-700">Upload Your Image</h2>
+    <p class="mb-6 text-gray-700">
+      Thank you for claiming your pixels! Now you can upload a picture to display in your selected space.
+      Please use a JPG, PNG, or GIF under 5MB. It will be automatically resized to fit your selection.
+    </p>
+
+    <form action="/upload/{{ session_id }}" method="POST" enctype="multipart/form-data" class="space-y-4">
+      <input
+        type="file"
+        name="image"
+        accept=".jpg, .jpeg, .png, .gif"
+        required
+        class="block w-full text-sm text-gray-600 border border-gray-300 rounded-md p-2"
+      >
+      <button
+        type="submit"
+        class="bg-pink-600 text-white px-6 py-2 rounded hover:bg-pink-700 transition"
+      >
+        Upload & Finish
+      </button>
+    </form>
+  </main>
+
+  <!-- Footer -->
+  <footer class="text-center py-6 text-sm text-gray-500 mt-10">
+    &copy; {{ year }} The Digital Memory Lane. All rights reserved.
+  </footer>
+
+</body>
+</html>
