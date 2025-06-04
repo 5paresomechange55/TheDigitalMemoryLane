@@ -3,3 +3,4 @@ gunicorn
 stripe
 python-dotenv
 Pillow
+flask_cors
