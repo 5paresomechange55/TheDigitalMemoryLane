@@ -81,6 +81,14 @@ def create_checkout_session():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/success')
+def success():
+    return render_template('success.html')
+
+@app.route('/cancel')
+def cancel():
+    return render_template('cancel.html')
+
 @app.route('/upload/<session_id>', methods=['GET', 'POST'])
 def upload(session_id):
     pixel_file = f"data/{session_id}.json"
