@@ -47,10 +47,6 @@ def contact():
 def donation():
     return render_template('donation.html')
 
-@app.route('/upload', methods=['GET', 'POST'])
-def upload():
-    return render_template('upload.html')
-
 @app.route('/get-claimed-pixels')
 def get_claimed_pixels():
     return jsonify(claimed_pixels)
