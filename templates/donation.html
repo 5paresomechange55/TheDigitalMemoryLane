@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Donation Station</title>
+  <script>
+    async function fetchVotes() {
+      const res = await fetch('/api/votes');
+      const data = await res.json();
+      document.getElementById('votes').innerHTML = `
+        <ul class="text-lg">
+          <li><strong>Charity One:</strong> ${data.charity1} votes</li>
+          <li><strong>Charity Two:</strong> ${data.charity2} votes</li>
+          <li><strong>Charity Three:</strong> ${data.charity3} votes</li>
+          <li><strong>Charity Four:</strong> ${data.charity4} votes</li>
+        </ul>`;
+    }
+
+    setInterval(fetchVotes, 3000);
+    window.onload = fetchVotes;
+  </script>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-yellow-50 text-center p-6">
+  <h1 class="text-4xl font-bold mb-4 text-green-800">🌱 Donation Station</h1>
+  <p class="text-gray-700 mb-6">Live tally of charity votes from pixel purchases</p>
+  <div id="votes" class="bg-white shadow-lg rounded p-6 max-w-md mx-auto border-2 border-yellow-300"></div>
+</body>
+</html>
