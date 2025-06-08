@@ -1,105 +1,160 @@
-const canvas = document.getElementById('pixelCanvas');
-const ctx = canvas.getContext('2d');
-const checkoutBtn = document.getElementById('checkoutBtn');
-const undoBtn = document.getElementById('undoBtn');
-const clearBtn = document.getElementById('clearBtn');
-const charitySelect = document.getElementById('charitySelect');
-const pixelTracker = document.getElementById('pixelTracker');
-
-const gridWidth = 1000;
-const gridHeight = 3000;
-const selectedPixels = [];
-const claimedPixels = new Set();
-const pixelSize = 1;
-
-let zoom = 1;
+let canvas = document.getElementById("pixelCanvas");
+let ctx = canvas.getContext("2d");
+let scale = 1;
 let offsetX = 0;
 let offsetY = 0;
 let isDragging = false;
-let startDrag = {};
+let startX, startY;
+let selectedPixels = new Set();
+let claimedPixels = new Set(); // Claimed pixels from server
+const pricePerPixel = 1;
 
-const stripe = Stripe(window.publishableKey);
-
-fetch('/api/claimed-pixels')
+// Load claimed pixels from server
+fetch("/claimed_pixels")
   .then(res => res.json())
-  .then(pixels => {
-    pixels.forEach(([x, y]) => claimedPixels.add(`${x},${y}`));
-    updateCanvas();
+  .then(data => {
+    data.claimed.forEach(p => claimedPixels.add(p));
+    drawCanvas();
+    updatePixelTracker(); // Initialize pixel tracker
   });
 
-canvas.addEventListener('mousedown', e => {
+canvas.addEventListener("mousedown", (e) => {
   isDragging = true;
-  startDrag = { x: e.offsetX, y: e.offsetY };
+  startX = e.clientX - offsetX;
+  startY = e.clientY - offsetY;
 });
 
-canvas.addEventListener('mouseup', () => {
+canvas.addEventListener("mouseup", () => isDragging = false);
+canvas.addEventListener("mouseout", () => isDragging = false);
+
+canvas.addEventListener("mousemove", (e) => {
+  if (isDragging) {
+    offsetX = e.clientX - startX;
+    offsetY = e.clientY - startY;
+    drawCanvas();
+  }
+});
+
+canvas.addEventListener("wheel", (e) => {
+  e.preventDefault();
+  const zoom = e.deltaY < 0 ? 1.1 : 0.9;
+  scale *= zoom;
+  drawCanvas();
+});
+
+canvas.addEventListener("click", (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const x = Math.floor((e.clientX - rect.left - offsetX) / scale);
+  const y = Math.floor((e.clientY - rect.top - offsetY) / scale);
+  const key = `${x},${y}`;
+
+  if (claimedPixels.has(key)) return;
+
+  if (selectedPixels.has(key)) {
+    selectedPixels.delete(key);
+  } else {
+    selectedPixels.add(key);
+  }
+
+  updatePriceDisplay();
+  updatePixelTracker();
+  drawCanvas();
+});
+
+// Touch support for mobile devices
+canvas.addEventListener("touchstart", (e) => {
+  if (e.touches.length === 1) {
+    isDragging = true;
+    startX = e.touches[0].clientX - offsetX;
+    startY = e.touches[0].clientY - offsetY;
+  }
+}, { passive: false });
+
+canvas.addEventListener("touchmove", (e) => {
+  if (isDragging && e.touches.length === 1) {
+    offsetX = e.touches[0].clientX - startX;
+    offsetY = e.touches[0].clientY - startY;
+    drawCanvas();
+  }
+}, { passive: false });
+
+canvas.addEventListener("touchend", () => {
   isDragging = false;
 });
 
-canvas.addEventListener('mousemove', e => {
-  if (isDragging) {
-    offsetX += (e.offsetX - startDrag.x) / zoom;
-    offsetY += (e.offsetY - startDrag.y) / zoom;
-    startDrag = { x: e.offsetX, y: e.offsetY };
-    updateCanvas();
-  }
-});
-
-canvas.addEventListener('click', e => {
-  const x = Math.floor((e.offsetX / zoom - offsetX));
-  const y = Math.floor((e.offsetY / zoom - offsetY));
-  const key = `${x},${y}`;
-
-  if (!claimedPixels.has(key)) {
-    selectedPixels.push([x, y]);
-    updateCanvas();
-  }
-});
-
-undoBtn.onclick = () => {
-  selectedPixels.pop();
-  updateCanvas();
-};
-
-clearBtn.onclick = () => {
-  selectedPixels.length = 0;
-  updateCanvas();
-};
-
-checkoutBtn.onclick = async () => {
-  const vote = charitySelect.value;
-  if (!vote || vote === "Select a Charity") {
-    alert("Please select a charity.");
-    return;
-  }
-
-  const res = await fetch('/create-checkout-session', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ pixels: selectedPixels, vote })
-  });
-  const session = await res.json();
-  stripe.redirectToCheckout({ sessionId: session.id });
-};
-
-function updateCanvas() {
+function drawCanvas() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.save();
   ctx.translate(offsetX, offsetY);
-  ctx.scale(zoom, zoom);
+  ctx.scale(scale, scale);
 
-  for (let i = 0; i < selectedPixels.length; i++) {
-    const [x, y] = selectedPixels[i];
-    ctx.fillStyle = 'blue';
-    ctx.fillRect(x, y, pixelSize, pixelSize);
+  for (let x = 0; x < canvas.width; x++) {
+    for (let y = 0; y < canvas.height; y++) {
+      const key = `${x},${y}`;
+      if (claimedPixels.has(key)) {
+        ctx.fillStyle = "gray";
+      } else if (selectedPixels.has(key)) {
+        ctx.fillStyle = "gold";
+      } else {
+        ctx.fillStyle = "white";
+      }
+      ctx.fillRect(x, y, 1, 1);
+    }
   }
 
-  claimedPixels.forEach(key => {
-    const [x, y] = key.split(',').map(Number);
-    ctx.fillStyle = 'gray';
-    ctx.fillRect(x, y, pixelSize, pixelSize);
-  });
-
   ctx.restore();
-  pixelTracker.textContent = `${claimedPixels.size + selectedPixels.length} / ${gridWidth * gridHeight} pixels claimed`;
 }
+
+function updatePriceDisplay() {
+  const count = selectedPixels.size;
+  document.getElementById("pixelCount").innerText = count;
+  document.getElementById("totalPrice").innerText = count * pricePerPixel;
+}
+
+function updatePixelTracker() {
+  const totalPixels = canvas.width * canvas.height;
+  const claimedCount = claimedPixels.size;
+  const selectedCount = selectedPixels.size;
+  const totalClaimed = claimedCount + selectedCount;
+
+  const percent = ((totalClaimed / totalPixels) * 100).toFixed(2);
+  const tracker = document.getElementById("pixelTracker");
+
+  if (tracker) {
+    tracker.innerText = `Pixels claimed: ${totalClaimed} / ${totalPixels} (${percent}%)`;
+  }
+}
+
+// Stripe payment
+document.getElementById("payButton").addEventListener("click", () => {
+  if (selectedPixels.size === 0) return;
+
+  fetch("/create-checkout-session", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ pixels: Array.from(selectedPixels) }),
+  })
+    .then(res => res.json())
+    .then(data => {
+      return Stripe(data.publicKey).redirectToCheckout({ sessionId: data.sessionId });
+    })
+    .catch(err => {
+      document.getElementById("errorMessage").innerText = "Payment failed. Try again.";
+      console.error(err);
+    });
+});
+
+// Undo and deselect buttons
+document.getElementById("undoButton")?.addEventListener("click", () => {
+  selectedPixels.clear();
+  updatePriceDisplay();
+  updatePixelTracker();
+  drawCanvas();
+});
+
+document.getElementById("deselectAllButton")?.addEventListener("click", () => {
+  selectedPixels.clear();
+  updatePriceDisplay();
+  updatePixelTracker();
+  drawCanvas();
+});
