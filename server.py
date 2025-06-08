@@ -1,55 +1,33 @@
 import os
-from flask import Flask, render_template, request, jsonify, send_from_directory, redirect
-from flask_cors import CORS
-import stripe
 import json
-from PIL import Image
+from flask import Flask, request, jsonify, render_template, send_from_directory, redirect
+from flask_cors import CORS
 from werkzeug.utils import secure_filename
+from PIL import Image
+import stripe
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = Flask(__name__)
 CORS(app)
 
-# Stripe setup
-stripe.api_key = os.getenv("STRIPE_SECRET_KEY", "sk_test_...")
-YOUR_DOMAIN = os.getenv("YOUR_DOMAIN", "http://localhost:5000")
+# Stripe keys
+stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
+PUBLISHABLE_KEY = os.getenv("STRIPE_PUBLISHABLE_KEY")
 
-# State
-CLAIMED_PIXELS_FILE = "claimed_pixels.json"
-VOTES_FILE = "charity_votes.json"
-UPLOAD_FOLDER = "uploads"
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
+# Pixel state and vote store
+claimed_pixels = set()
+votes = {"Charity A": 0, "Charity B": 0, "Charity C": 0, "Charity D": 0}
 
-# Ensure directories and files exist
+# Image upload path
+UPLOAD_FOLDER = 'static/uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-if not os.path.exists(CLAIMED_PIXELS_FILE):
-    with open(CLAIMED_PIXELS_FILE, 'w') as f:
-        json.dump([], f)
-if not os.path.exists(VOTES_FILE):
-    with open(VOTES_FILE, 'w') as f:
-        json.dump({"Charity A": 0, "Charity B": 0, "Charity C": 0, "Charity D": 0}, f)
-
-def load_claimed():
-    with open(CLAIMED_PIXELS_FILE, 'r') as f:
-        return json.load(f)
-
-def save_claimed(pixels):
-    with open(CLAIMED_PIXELS_FILE, 'w') as f:
-        json.dump(pixels, f)
-
-def load_votes():
-    with open(VOTES_FILE, 'r') as f:
-        return json.load(f)
-
-def save_votes(votes):
-    with open(VOTES_FILE, 'w') as f:
-        json.dump(votes, f)
-
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 @app.route('/')
-def home():
-    return render_template('index.html')
+def index():
+    return render_template('index.html', publishable_key=PUBLISHABLE_KEY)
 
 @app.route('/about')
 def about():
@@ -61,80 +39,68 @@ def contact():
 
 @app.route('/donation')
 def donation():
-    return render_template('donation.html')
+    return render_template('donation.html', votes=votes)
 
 @app.route('/upload', methods=['GET', 'POST'])
 def upload():
     if request.method == 'POST':
-        pixels = request.form.getlist('pixels[]')
-        file = request.files.get('image')
-        if file and allowed_file(file.filename):
-            filename = secure_filename(file.filename)
-            filepath = os.path.join(UPLOAD_FOLDER, filename)
-            file.save(filepath)
+        file = request.files['image']
+        pixels = json.loads(request.form['pixels'])
+        filename = secure_filename(file.filename)
+        path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        file.save(path)
 
-            img = Image.open(filepath)
-            img = img.convert('RGB')
-            width = max(10, len(pixels)) * 10
-            img = img.resize((width, 10))
-            img.save(filepath)
+        # Resize to fit the selected pixel area
+        width = max(x for x, y in pixels) - min(x for x, y in pixels) + 1
+        height = max(y for x, y in pixels) - min(y for x, y in pixels) + 1
 
-            claimed = load_claimed()
-            claimed.extend(pixels)
-            save_claimed(list(set(claimed)))
+        img = Image.open(path)
+        img = img.resize((width, height))
+        img.save(path)
 
-            return redirect('/')
-    else:
-        pixels = request.args.getlist('pixels')
-        return render_template('upload.html', pixels=pixels)
-
-@app.route('/claimed')
-def claimed():
-    claimed = load_claimed()
-    return jsonify({"claimed": claimed})
-
-@app.route('/votes')
-def votes():
-    return jsonify(load_votes())
+        return redirect('/')
+    return render_template('upload.html')
 
 @app.route('/create-checkout-session', methods=['POST'])
 def create_checkout_session():
     data = request.get_json()
-    pixels = data.get("pixels", [])
-    charity = data.get("charity", "None")
-    price = len(pixels)
+    selected_pixels = data.get('pixels', [])
+    vote = data.get('vote')
 
-    if not pixels:
-        return jsonify({'error': 'No pixels selected'}), 400
-
-    # Save charity vote temporarily
-    votes = load_votes()
-    if charity in votes:
-        votes[charity] += len(pixels)
-    save_votes(votes)
+    if vote in votes:
+        votes[vote] += len(selected_pixels)
 
     session = stripe.checkout.Session.create(
         payment_method_types=['card'],
         line_items=[{
             'price_data': {
                 'currency': 'usd',
+                'unit_amount': 100 * len(selected_pixels),
                 'product_data': {
-                    'name': f'{len(pixels)} Digital Memory Pixels',
+                    'name': f'{len(selected_pixels)} Pixels on TheDigitalMemoryLane',
                 },
-                'unit_amount': 100,
             },
-            'quantity': len(pixels),
+            'quantity': 1,
         }],
         mode='payment',
-        success_url=f"{YOUR_DOMAIN}/upload?pixels=" + ','.join(pixels),
-        cancel_url=f"{YOUR_DOMAIN}/",
+        success_url=request.host_url + 'upload',
+        cancel_url=request.host_url,
     )
+    return jsonify({'id': session.id})
 
-    return jsonify({'sessionId': session.id, 'publicKey': os.getenv("STRIPE_PUBLISHABLE_KEY", "pk_test_...")})
+@app.route('/api/claimed-pixels')
+def api_claimed_pixels():
+    return jsonify(list(claimed_pixels))
 
-@app.route('/uploads/<filename>')
-def uploaded_file(filename):
-    return send_from_directory(UPLOAD_FOLDER, filename)
+@app.route('/api/votes')
+def api_votes():
+    return jsonify(votes)
+
+@app.route('/claim-pixels', methods=['POST'])
+def claim_pixels():
+    new_pixels = request.get_json().get('pixels', [])
+    claimed_pixels.update(map(tuple, new_pixels))
+    return jsonify({'status': 'success'})
 
 if __name__ == '__main__':
     app.run(debug=True)
