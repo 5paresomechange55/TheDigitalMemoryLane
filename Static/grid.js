@@ -8,6 +8,7 @@ let startX, startY;
 let selectedPixels = new Set();
 let claimedPixels = new Set(); // Claimed pixels from server
 const pricePerPixel = 1;
+const pixelSize = 10;
 
 // Load claimed pixels from server
 fetch("/claimed_pixels")
@@ -44,8 +45,8 @@ canvas.addEventListener("wheel", (e) => {
 
 canvas.addEventListener("click", (e) => {
   const rect = canvas.getBoundingClientRect();
-  const x = Math.floor((e.clientX - rect.left - offsetX) / scale);
-  const y = Math.floor((e.clientY - rect.top - offsetY) / scale);
+  const x = Math.floor((e.clientX - rect.left - offsetX) / scale / pixelSize);
+  const y = Math.floor((e.clientY - rect.top - offsetY) / scale / pixelSize);
   const key = `${x},${y}`;
 
   if (claimedPixels.has(key)) return;
@@ -88,17 +89,20 @@ function drawCanvas() {
   ctx.translate(offsetX, offsetY);
   ctx.scale(scale, scale);
 
-  for (let x = 0; x < canvas.width; x++) {
-    for (let y = 0; y < canvas.height; y++) {
+  for (let x = 0; x < canvas.width / pixelSize; x++) {
+    for (let y = 0; y < canvas.height / pixelSize; y++) {
       const key = `${x},${y}`;
+
       if (claimedPixels.has(key)) {
         ctx.fillStyle = "gray";
       } else if (selectedPixels.has(key)) {
-        ctx.fillStyle = "gold";
+        ctx.fillStyle = "blue";
       } else {
         ctx.fillStyle = "white";
       }
-      ctx.fillRect(x, y, 1, 1);
+
+      ctx.fillRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
+      ctx.strokeRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
     }
   }
 
