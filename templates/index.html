@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>The Digital Memory Lane</title>
   <script src="https://js.stripe.com/v3/"></script>
-  <script defer src="grid.js"></script>
+  <script defer src="/static/grid.js"></script>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <style>
     body {
@@ -13,16 +13,16 @@
       background: linear-gradient(to right, #fff8dc, #ffebcd);
       color: #4b2e2e;
     }
-    #canvasContainer {
-      overflow: scroll;
-      max-height: 80vh;
-      border: 4px dashed #deb887;
-      background-color: #fef6e4;
-    }
     canvas {
+      image-rendering: pixelated;
       display: block;
       margin: auto;
-      image-rendering: pixelated;
+    }
+    #canvasContainer {
+      overflow: scroll;
+      max-height: 75vh;
+      border: 4px dashed #deb887;
+      background-color: #fef6e4;
     }
     ::-webkit-scrollbar {
       width: 10px;
@@ -33,43 +33,68 @@
   </style>
 </head>
 <body class="p-4">
-  <nav class="bg-yellow-100 py-4 px-6 mb-6 shadow-md flex justify-between">
-    <div class="text-2xl font-bold text-yellow-900">📸 Digital Memory Lane</div>
-    <div class="space-x-6 text-lg">
-      <a href="/" class="hover:underline">Home</a>
-      <a href="/about" class="hover:underline">About Us</a>
-      <a href="/contact" class="hover:underline">Contact Us</a>
-      <a href="/donation" class="hover:underline text-green-700 font-semibold">Donation Station</a>
-    </div>
+  <!-- Navigation -->
+  <nav class="flex justify-between items-center mb-6 px-4 py-3 bg-yellow-100 shadow-md rounded">
+    <h1 class="text-3xl font-bold text-yellow-900">The Digital Memory Lane</h1>
+    <ul class="flex gap-6 text-yellow-800 font-semibold">
+      <li><a href="/" class="hover:underline">Home</a></li>
+      <li><a href="/about" class="hover:underline">About Us</a></li>
+      <li><a href="/contact" class="hover:underline">Contact Us</a></li>
+      <li><a href="/donation" class="hover:underline">Donation Station</a></li>
+    </ul>
   </nav>
 
-  <div class="max-w-6xl mx-auto text-center">
-    <h1 class="text-4xl font-bold mb-2 text-yellow-900">🎞️ The Digital Memory Lane</h1>
-    <p class="mb-4 italic text-gray-700">Claim a piece of online history — one nostalgic pixel at a time.</p>
+  <!-- Intro -->
+  <div class="max-w-5xl mx-auto text-center mb-4">
+    <p class="text-lg italic text-gray-700">Buy a piece of online history — one nostalgic pixel at a time.</p>
+  </div>
 
-    <div class="mb-4 flex justify-center gap-8 text-lg">
-      <p><strong>Selected Pixels:</strong> <span id="pixelCount">0</span></p>
-      <p><strong>Total Price:</strong> $<span id="totalPrice">0</span></p>
-    </div>
+  <!-- Pixel Tracker -->
+  <div class="flex justify-center gap-8 text-lg mb-4">
+    <p><strong>Selected Pixels:</strong> <span id="pixelCount">0</span></p>
+    <p><strong>Total Price:</strong> $<span id="totalPrice">0</span></p>
+    <p><strong>Claimed:</strong> <span id="claimedPixels">0</span> / 3,000,000</p>
+  </div>
 
-    <div class="mb-4">
-      <label for="charitySelect" class="block font-semibold text-lg text-yellow-800">Choose a charity to vote for:</label>
-      <select id="charitySelect" class="mt-1 p-2 border border-yellow-400 rounded-md">
-        <option value="charity1">Charity One</option>
-        <option value="charity2">Charity Two</option>
-        <option value="charity3">Charity Three</option>
-        <option value="charity4">Charity Four</option>
-      </select>
-    </div>
+  <!-- Canvas -->
+  <div id="canvasContainer" class="rounded shadow-md mx-auto mb-6 max-w-6xl">
+    <canvas id="pixelCanvas" width="1000" height="3000"></canvas>
+  </div>
 
-    <div id="canvasContainer" class="rounded shadow-lg mb-6">
-      <canvas id="pixelCanvas" width="1000" height="3000"></canvas>
-    </div>
+  <!-- Action Buttons -->
+  <div class="flex justify-center gap-4 mb-6">
+    <button id="undoButton" class="bg-yellow-700 hover:bg-yellow-800 text-white font-bold py-2 px-4 rounded">
+      Undo
+    </button>
+    <button id="deselectButton" class="bg-yellow-700 hover:bg-yellow-800 text-white font-bold py-2 px-4 rounded">
+      Deselect All
+    </button>
+  </div>
 
-    <button id="payButton" class="bg-yellow-700 hover:bg-yellow-800 text-white font-bold py-3 px-8 rounded-full shadow-md transition">
+  <!-- Charity Dropdown -->
+  <div class="text-center mb-4">
+    <label for="charitySelect" class="block mb-2 font-semibold">Choose a Charity to Support:</label>
+    <select id="charitySelect" class="px-4 py-2 rounded border border-yellow-700 bg-white text-yellow-800">
+      <option value="">-- Select Charity --</option>
+      <option value="charity_a">Charity A</option>
+      <option value="charity_b">Charity B</option>
+      <option value="charity_c">Charity C</option>
+      <option value="charity_d">Charity D</option>
+    </select>
+  </div>
+
+  <!-- Checkout -->
+  <div class="text-center mb-10">
+    <button id="payButton"
+            class="bg-yellow-700 hover:bg-yellow-800 text-white font-bold py-3 px-6 rounded-full shadow-lg transition">
       Pay & Claim Pixels
     </button>
-    <p id="errorMessage" class="text-red-600 mt-4"></p>
+    <p id="errorMessage" class="text-red-600 mt-3"></p>
   </div>
+
+  <!-- Footer -->
+  <footer class="text-center text-sm text-gray-600 mt-12">
+    <p>&copy; 2025 TheDigitalMemoryLane.com • Your moment in time, preserved forever.</p>
+  </footer>
 </body>
 </html>
