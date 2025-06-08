@@ -123,22 +123,34 @@ function updatePixelTracker() {
 }
 
 // Stripe payment
-document.getElementById("payButton").addEventListener("click", () => {
-  if (selectedPixels.size === 0) return;
+document.getElementById("payButton").addEventListener("click", async () => {
+  if (selectedPixels.length === 0) {
+    displayError("Please select at least one pixel.");
+    return;
+  }
 
-  fetch("/create-checkout-session", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ pixels: Array.from(selectedPixels) }),
-  })
-    .then(res => res.json())
-    .then(data => {
-      return Stripe(data.publicKey).redirectToCheckout({ sessionId: data.sessionId });
-    })
-    .catch(err => {
-      document.getElementById("errorMessage").innerText = "Payment failed. Try again.";
-      console.error(err);
+  const charity = document.getElementById("charitySelect").value;
+
+  try {
+    const response = await fetch("/create-checkout-session", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ pixels: selectedPixels, charity }),
     });
+
+    const data = await response.json();
+    if (data && data.id) {
+      const stripe = Stripe("pk_test_..."); // use environment variable or template var in production
+      stripe.redirectToCheckout({ sessionId: data.id });
+    } else {
+      displayError("Error creating Stripe session.");
+    }
+  } catch (err) {
+    console.error(err);
+    displayError("Network error while trying to checkout.");
+  }
 });
 
 // Undo and deselect buttons
