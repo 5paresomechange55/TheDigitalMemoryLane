@@ -63,25 +63,18 @@ canvas.addEventListener("click", (e) => {
 });
 
 // Touch support for mobile devices
-canvas.addEventListener("touchstart", (e) => {
-  if (e.touches.length === 1) {
-    isDragging = true;
-    startX = e.touches[0].clientX - offsetX;
-    startY = e.touches[0].clientY - offsetY;
-  }
-}, { passive: false });
+canvas.addEventListener('touchstart', (e) => onMouseDown(convertTouchToMouse(e)), { passive: false });
+canvas.addEventListener('touchmove', (e) => onMouseMove(convertTouchToMouse(e)), { passive: false });
+canvas.addEventListener('touchend', (e) => onMouseUp(convertTouchToMouse(e)), { passive: false });
 
-canvas.addEventListener("touchmove", (e) => {
-  if (isDragging && e.touches.length === 1) {
-    offsetX = e.touches[0].clientX - startX;
-    offsetY = e.touches[0].clientY - startY;
-    drawCanvas();
-  }
-}, { passive: false });
-
-canvas.addEventListener("touchend", () => {
-  isDragging = false;
-});
+function convertTouchToMouse(e) {
+  const touch = e.touches[0] || e.changedTouches[0];
+  return {
+    clientX: touch.clientX,
+    clientY: touch.clientY,
+    preventDefault: () => e.preventDefault()
+  };
+}
 
 function drawCanvas() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
