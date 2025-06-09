@@ -14,13 +14,14 @@ stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 app = Flask(__name__)
 CORS(app)
 
-# File paths
+# File paths and config
 PIXELS_FILE = 'data/claimed_pixels.json'
+VOTES_FILE = 'data/charity_votes.json'
 UPLOAD_FOLDER = 'static/uploads'
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-# Ensure folders exist
+# Ensure required folders exist
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs('data', exist_ok=True)
 
@@ -31,9 +32,21 @@ if os.path.exists(PIXELS_FILE):
 else:
     claimed_pixels = {}
 
+# Load charity votes
+if os.path.exists(VOTES_FILE):
+    with open(VOTES_FILE, 'r') as f:
+        charity_votes = json.load(f)
+else:
+    charity_votes = {
+        "charity1": 0,
+        "charity2": 0,
+        "charity3": 0,
+        "charity4": 0
+    }
+
 @app.route('/')
 def index():
-    return render_template('index.html')
+    return render_template('index.html', stripe_public_key=os.getenv("STRIPE_PUBLISHABLE_KEY"))
 
 @app.route('/about')
 def about():
@@ -51,18 +64,27 @@ def donation():
 def claimed_pixels_api():
     return jsonify({'claimed': list(claimed_pixels.keys())})
 
+@app.route('/charity-votes')
+def get_charity_votes():
+    return jsonify(charity_votes)
+
 @app.route('/create-checkout-session', methods=['POST'])
 def create_checkout_session():
     data = request.get_json()
     selected_pixels = data.get('pixels', [])
+    charity = data.get('charity', 'charity1')
 
     if not selected_pixels:
         return jsonify({'error': 'No pixels selected'}), 400
 
-    # Store selected pixels in a temporary session file
     session_id = f"session_{os.urandom(8).hex()}"
+    session_data = {
+        "pixels": selected_pixels,
+        "charity": charity
+    }
+
     with open(f"data/{session_id}.json", 'w') as f:
-        json.dump(selected_pixels, f)
+        json.dump(session_data, f)
 
     try:
         session = stripe.checkout.Session.create(
@@ -73,7 +95,7 @@ def create_checkout_session():
                     'product_data': {
                         'name': 'Digital Memory Lane Pixels',
                     },
-                    'unit_amount': 100,  # $1 per pixel
+                    'unit_amount': 100,
                 },
                 'quantity': len(selected_pixels),
             }],
@@ -87,9 +109,9 @@ def create_checkout_session():
 
 @app.route('/upload/<session_id>', methods=['GET', 'POST'])
 def upload(session_id):
-    pixel_file = f"data/{session_id}.json"
+    session_file = f"data/{session_id}.json"
 
-    if not os.path.exists(pixel_file):
+    if not os.path.exists(session_file):
         return "Invalid session", 400
 
     if request.method == 'POST':
@@ -105,26 +127,35 @@ def upload(session_id):
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             image.save(filepath)
 
-            # Resize image to fit selected pixels
-            with open(pixel_file, 'r') as f:
-                selected_pixels = json.load(f)
+            with open(session_file, 'r') as f:
+                session_data = json.load(f)
 
-            width = max(p[0] for p in selected_pixels) - min(p[0] for p in selected_pixels) + 1
-            height = max(p[1] for p in selected_pixels) - min(p[1] for p in selected_pixels) + 1
+            selected_pixels = session_data.get("pixels", [])
+            charity = session_data.get("charity", "charity1")
 
-            img = Image.open(filepath)
-            img = img.resize((width, height))
-            img.save(filepath, optimize=True, quality=85)
+            if selected_pixels:
+                xs = [p[0] for p in selected_pixels]
+                ys = [p[1] for p in selected_pixels]
+                width = max(xs) - min(xs) + 1
+                height = max(ys) - min(ys) + 1
 
-            # Mark pixels as claimed
-            for pixel in selected_pixels:
-                claimed_pixels[str(pixel)] = filename
+                img = Image.open(filepath)
+                img = img.resize((width, height))
+                img.save(filepath, optimize=True, quality=85)
 
-            with open(PIXELS_FILE, 'w') as f:
-                json.dump(claimed_pixels, f)
+                for pixel in selected_pixels:
+                    claimed_pixels[str(pixel)] = filename
 
-            os.remove(pixel_file)  # Cleanup session data
-            return redirect(url_for('index'))
+                with open(PIXELS_FILE, 'w') as f:
+                    json.dump(claimed_pixels, f)
+
+                # Update charity vote count
+                charity_votes[charity] = charity_votes.get(charity, 0) + 1
+                with open(VOTES_FILE, 'w') as f:
+                    json.dump(charity_votes, f)
+
+                os.remove(session_file)
+                return redirect(url_for('index'))
 
     return render_template('upload.html', session_id=session_id)
 
