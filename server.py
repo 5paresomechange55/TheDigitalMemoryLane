@@ -47,9 +47,9 @@ def contact():
 def donation():
     return render_template('donation.html')
 
-@app.route('/get-claimed-pixels')
-def get_claimed_pixels():
-    return jsonify(claimed_pixels)
+@app.route('/claimed-pixels')
+def claimed_pixels_api():
+    return jsonify({'claimed': list(claimed_pixels.keys())})
 
 @app.route('/create-checkout-session', methods=['POST'])
 def create_checkout_session():
