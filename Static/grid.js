@@ -15,6 +15,8 @@ let claimedPixels = new Set();
 // Touch handling
 let isTouching = false;
 let lastTouchDistance = null;
+let lastTouchX = null;
+let lastTouchY = null;
 
 // Zooming
 canvas.addEventListener("wheel", (e) => {
@@ -30,12 +32,14 @@ canvas.addEventListener("wheel", (e) => {
   drawGrid();
 }, { passive: false });
 
-function getCanvasCoordinates(e) {
-  const x = (e.clientX - canvas.getBoundingClientRect().left - offsetX) / scale;
-  const y = (e.clientY - canvas.getBoundingClientRect().top - offsetY) / scale;
+function getCanvasCoordinates(clientX, clientY) {
+  const rect = canvas.getBoundingClientRect();
+  const x = (clientX - rect.left - offsetX) / scale;
+  const y = (clientY - rect.top - offsetY) / scale;
   return { x: Math.floor(x), y: Math.floor(y) };
 }
 
+// Desktop mouse events
 canvas.addEventListener("mousedown", (e) => {
   isPanning = e.button === 1 || e.ctrlKey || e.metaKey;
   startX = e.clientX;
@@ -44,7 +48,7 @@ canvas.addEventListener("mousedown", (e) => {
 
 canvas.addEventListener("mouseup", (e) => {
   if (!isPanning) {
-    const { x, y } = getCanvasCoordinates(e);
+    const { x, y } = getCanvasCoordinates(e.clientX, e.clientY);
     selectPixel(x, y);
   }
   isPanning = false;
@@ -58,12 +62,15 @@ canvas.addEventListener("mousemove", (e) => {
   }
 });
 
+// Touch events
 canvas.addEventListener("touchstart", (e) => {
   if (e.touches.length === 1) {
     isTouching = true;
     const touch = e.touches[0];
-    const { x, y } = getCanvasCoordinates(touch);
+    const { x, y } = getCanvasCoordinates(touch.clientX, touch.clientY);
     selectPixel(x, y);
+    lastTouchX = touch.clientX;
+    lastTouchY = touch.clientY;
   } else if (e.touches.length === 2) {
     isTouching = false;
     lastTouchDistance = getTouchDistance(e.touches);
@@ -71,6 +78,7 @@ canvas.addEventListener("touchstart", (e) => {
 }, { passive: false });
 
 canvas.addEventListener("touchmove", (e) => {
+  e.preventDefault();
   if (e.touches.length === 2) {
     const newDistance = getTouchDistance(e.touches);
     const delta = newDistance - lastTouchDistance;
@@ -81,8 +89,12 @@ canvas.addEventListener("touchmove", (e) => {
     drawGrid();
   } else if (isTouching && e.touches.length === 1) {
     const touch = e.touches[0];
-    offsetX += e.movementX || 0;
-    offsetY += e.movementY || 0;
+    const dx = touch.clientX - lastTouchX;
+    const dy = touch.clientY - lastTouchY;
+    offsetX += dx;
+    offsetY += dy;
+    lastTouchX = touch.clientX;
+    lastTouchY = touch.clientY;
     drawGrid();
   }
 }, { passive: false });
@@ -151,6 +163,8 @@ document.getElementById("deselectAllButton").addEventListener("click", () => {
 
 document.getElementById("payButton").addEventListener("click", async () => {
   const errorDisplay = document.getElementById("errorMessage");
+  errorDisplay.textContent = "";
+
   if (selectedPixels.length === 0) {
     errorDisplay.textContent = "Please select at least one pixel.";
     return;
@@ -167,7 +181,7 @@ document.getElementById("payButton").addEventListener("click", async () => {
 
     const data = await response.json();
     if (data?.id) {
-      const stripe = Stripe("pk_test_..."); // Replace or dynamically inject in production
+      const stripe = Stripe("pk_test_51RTDqT2c0Glb9QyZNKJzKHIZMfZXmAHBPzFVyxhz22a2cPmsOmzEswfHCYsd68z8HXbeASNV8fI0zoRr3SCSIjTC005jaokCP9");
       stripe.redirectToCheckout({ sessionId: data.id });
     } else {
       errorDisplay.textContent = "Error creating checkout session.";
@@ -179,11 +193,15 @@ document.getElementById("payButton").addEventListener("click", async () => {
 });
 
 async function fetchClaimedPixels() {
-  const res = await fetch("/claimed-pixels");
-  const data = await res.json();
-  data.claimed.forEach(coord => claimedPixels.add(coord));
-  document.getElementById("claimedPixels").innerText = claimedPixels.size;
-  drawGrid();
+  try {
+    const res = await fetch("/claimed-pixels");
+    const data = await res.json();
+    data.claimed.forEach(coord => claimedPixels.add(coord));
+    document.getElementById("claimedPixels").innerText = claimedPixels.size;
+    drawGrid();
+  } catch (e) {
+    console.error("Failed to fetch claimed pixels:", e);
+  }
 }
 
 fetchClaimedPixels();
