@@ -63,51 +63,97 @@ canvas.addEventListener("mousemove", (e) => {
 });
 
 // Touch events
-canvas.addEventListener("touchstart", (e) => {
-  if (e.touches.length === 1) {
-    isTouching = true;
-    const touch = e.touches[0];
-    const { x, y } = getCanvasCoordinates(touch.clientX, touch.clientY);
-    selectPixel(x, y);
-    lastTouchX = touch.clientX;
-    lastTouchY = touch.clientY;
-  } else if (e.touches.length === 2) {
-    isTouching = false;
-    lastTouchDistance = getTouchDistance(e.touches);
+let lastTouchDist = 0;
+let lastTouchCenter = null;
+
+canvas.addEventListener("touchstart", e => {
+  if (e.touches.length === 2) {
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    lastTouchDist = Math.hypot(dx, dy);
+    lastTouchCenter = {
+      x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+      y: (e.touches[0].clientY + e.touches[1].clientY) / 2
+    };
+  } else if (e.touches.length === 1) {
+    isDragging = true;
+    dragStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
   }
 }, { passive: false });
 
-canvas.addEventListener("touchmove", (e) => {
+canvas.addEventListener("touchmove", e => {
   e.preventDefault();
   if (e.touches.length === 2) {
-    const newDistance = getTouchDistance(e.touches);
-    const delta = newDistance - lastTouchDistance;
-    const zoomIntensity = 0.005;
-    const factor = 1 + delta * zoomIntensity;
-    scale *= factor;
-    lastTouchDistance = newDistance;
-    drawGrid();
-  } else if (isTouching && e.touches.length === 1) {
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    const newDist = Math.hypot(dx, dy);
+    const newCenter = {
+      x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+      y: (e.touches[0].clientY + e.touches[1].clientY) / 2
+    };
+
+    const zoom = newDist / lastTouchDist;
+    originX = newCenter.x - (newCenter.x - originX) * zoom;
+    originY = newCenter.y - (newCenter.y - originY) * zoom;
+    scale *= zoom;
+
+    lastTouchDist = newDist;
+    lastTouchCenter = newCenter;
+    drawCanvas();
+  } else if (e.touches.length === 1 && isDragging) {
     const touch = e.touches[0];
-    const dx = touch.clientX - lastTouchX;
-    const dy = touch.clientY - lastTouchY;
-    offsetX += dx;
-    offsetY += dy;
-    lastTouchX = touch.clientX;
-    lastTouchY = touch.clientY;
-    drawGrid();
+    originX += touch.clientX - dragStart.x;
+    originY += touch.clientY - dragStart.y;
+    dragStart = { x: touch.clientX, y: touch.clientY };
+    drawCanvas();
   }
 }, { passive: false });
 
-canvas.addEventListener("touchend", () => {
-  isTouching = false;
+canvas.addEventListener("touchend", e => {
+  isDragging = false;
+  if (e.touches.length === 0 && e.changedTouches.length === 1) {
+    const touch = e.changedTouches[0];
+    const rect = canvas.getBoundingClientRect();
+    const x = touch.clientX - rect.left;
+    const y = touch.clientY - rect.top;
+    const [px, py] = getPixelCoords(x, y);
+    const key = `${px},${py}`;
+    if (selectedPixels.has(key)) {
+      selectedPixels.delete(key);
+    } else {
+      selectedPixels.add(key);
+    }
+    updateUI();
+    drawCanvas();
+  }
 }, { passive: false });
 
-function getTouchDistance(touches) {
-  const dx = touches[0].clientX - touches[1].clientX;
-  const dy = touches[0].clientY - touches[1].clientY;
-  return Math.sqrt(dx * dx + dy * dy);
+function updateUI() {
+  const count = selectedPixels.size;
+  document.getElementById("pixelCount").innerText = count;
+  document.getElementById("totalPrice").innerText = count * pixelPrice;
 }
+
+document.getElementById("payButton").addEventListener("click", async () => {
+  const pixelCount = selectedPixels.size;
+  if (pixelCount === 0) return;
+
+  const response = await fetch("/create-checkout-session", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ pixels: pixelCount }),
+  });
+
+  const data = await response.json();
+  if (data.id) {
+    const stripe = Stripe("pk_test_51RTDqT2c0Glb9QyZNKJzKHIZMfZXmAHBPzFVyxhz22a2cPmsOmzEswfHCYsd68z8HXbeASNV8fI0zoRr3SCSIjTC005jaokCP9");
+    stripe.redirectToCheckout({ sessionId: data.id });
+  } else {
+    document.getElementById("errorMessage").innerText = data.error;
+  }
+});
+
+drawCanvas();
 
 function selectPixel(x, y) {
   const key = `${x},${y}`;
