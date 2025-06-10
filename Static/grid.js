@@ -1,24 +1,34 @@
 const canvas = document.getElementById("pixelCanvas");
 const ctx = canvas.getContext("2d");
+
 const pixelSize = 1;
 const width = canvas.width;
 const height = canvas.height;
+
 let scale = 1;
 let offsetX = 0;
 let offsetY = 0;
 let isPanning = false;
 let startX, startY;
+
 let selectedPixels = [];
 let pixelHistory = [];
 let claimedPixels = new Set();
 
 // Touch handling
-let isTouching = false;
-let lastTouchDistance = null;
-let lastTouchX = null;
-let lastTouchY = null;
+let isDragging = false;
+let dragStart = null;
+let lastTouchDist = 0;
+let lastTouchCenter = null;
 
-// Zooming
+function getCanvasCoordinates(clientX, clientY) {
+  const rect = canvas.getBoundingClientRect();
+  const x = (clientX - rect.left - offsetX) / scale;
+  const y = (clientY - rect.top - offsetY) / scale;
+  return { x: Math.floor(x), y: Math.floor(y) };
+}
+
+// ZOOM: Mouse wheel
 canvas.addEventListener("wheel", (e) => {
   e.preventDefault();
   const zoomIntensity = 0.1;
@@ -32,14 +42,7 @@ canvas.addEventListener("wheel", (e) => {
   drawGrid();
 }, { passive: false });
 
-function getCanvasCoordinates(clientX, clientY) {
-  const rect = canvas.getBoundingClientRect();
-  const x = (clientX - rect.left - offsetX) / scale;
-  const y = (clientY - rect.top - offsetY) / scale;
-  return { x: Math.floor(x), y: Math.floor(y) };
-}
-
-// Desktop mouse events
+// DESKTOP mouse pan + select
 canvas.addEventListener("mousedown", (e) => {
   isPanning = e.button === 1 || e.ctrlKey || e.metaKey;
   startX = e.clientX;
@@ -49,7 +52,7 @@ canvas.addEventListener("mousedown", (e) => {
 canvas.addEventListener("mouseup", (e) => {
   if (!isPanning) {
     const { x, y } = getCanvasCoordinates(e.clientX, e.clientY);
-    selectPixel(x, y);
+    togglePixelSelection(x, y);
   }
   isPanning = false;
 });
@@ -62,18 +65,15 @@ canvas.addEventListener("mousemove", (e) => {
   }
 });
 
-// Touch events
-let lastTouchDist = 0;
-let lastTouchCenter = null;
-
-canvas.addEventListener("touchstart", e => {
+// TOUCH events for mobile
+canvas.addEventListener("touchstart", (e) => {
   if (e.touches.length === 2) {
     const dx = e.touches[0].clientX - e.touches[1].clientX;
     const dy = e.touches[0].clientY - e.touches[1].clientY;
     lastTouchDist = Math.hypot(dx, dy);
     lastTouchCenter = {
       x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
-      y: (e.touches[0].clientY + e.touches[1].clientY) / 2
+      y: (e.touches[0].clientY + e.touches[1].clientY) / 2,
     };
   } else if (e.touches.length === 1) {
     isDragging = true;
@@ -81,7 +81,7 @@ canvas.addEventListener("touchstart", e => {
   }
 }, { passive: false });
 
-canvas.addEventListener("touchmove", e => {
+canvas.addEventListener("touchmove", (e) => {
   e.preventDefault();
   if (e.touches.length === 2) {
     const dx = e.touches[0].clientX - e.touches[1].clientX;
@@ -89,84 +89,58 @@ canvas.addEventListener("touchmove", e => {
     const newDist = Math.hypot(dx, dy);
     const newCenter = {
       x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
-      y: (e.touches[0].clientY + e.touches[1].clientY) / 2
+      y: (e.touches[0].clientY + e.touches[1].clientY) / 2,
     };
 
     const zoom = newDist / lastTouchDist;
-    originX = newCenter.x - (newCenter.x - originX) * zoom;
-    originY = newCenter.y - (newCenter.y - originY) * zoom;
+    const canvasX = (newCenter.x - canvas.getBoundingClientRect().left - offsetX) / scale;
+    const canvasY = (newCenter.y - canvas.getBoundingClientRect().top - offsetY) / scale;
     scale *= zoom;
+    offsetX = newCenter.x - canvasX * scale - canvas.getBoundingClientRect().left;
+    offsetY = newCenter.y - canvasY * scale - canvas.getBoundingClientRect().top;
 
     lastTouchDist = newDist;
     lastTouchCenter = newCenter;
-    drawCanvas();
+    drawGrid();
   } else if (e.touches.length === 1 && isDragging) {
     const touch = e.touches[0];
-    originX += touch.clientX - dragStart.x;
-    originY += touch.clientY - dragStart.y;
+    offsetX += touch.clientX - dragStart.x;
+    offsetY += touch.clientY - dragStart.y;
     dragStart = { x: touch.clientX, y: touch.clientY };
-    drawCanvas();
+    drawGrid();
   }
 }, { passive: false });
 
-canvas.addEventListener("touchend", e => {
+canvas.addEventListener("touchend", (e) => {
   isDragging = false;
   if (e.touches.length === 0 && e.changedTouches.length === 1) {
     const touch = e.changedTouches[0];
     const rect = canvas.getBoundingClientRect();
     const x = touch.clientX - rect.left;
     const y = touch.clientY - rect.top;
-    const [px, py] = getPixelCoords(x, y);
-    const key = `${px},${py}`;
-    if (selectedPixels.has(key)) {
-      selectedPixels.delete(key);
-    } else {
-      selectedPixels.add(key);
-    }
-    updateUI();
-    drawCanvas();
+    const coords = getCanvasCoordinates(x + rect.left, y + rect.top);
+    togglePixelSelection(coords.x, coords.y);
   }
 }, { passive: false });
 
-function updateUI() {
-  const count = selectedPixels.size;
-  document.getElementById("pixelCount").innerText = count;
-  document.getElementById("totalPrice").innerText = count * pixelPrice;
-}
-
-document.getElementById("payButton").addEventListener("click", async () => {
-  const pixelCount = selectedPixels.size;
-  if (pixelCount === 0) return;
-
-  const response = await fetch("/create-checkout-session", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ pixels: pixelCount }),
-  });
-
-  const data = await response.json();
-  if (data.id) {
-    const stripe = Stripe("pk_test_51RTDqT2c0Glb9QyZNKJzKHIZMfZXmAHBPzFVyxhz22a2cPmsOmzEswfHCYsd68z8HXbeASNV8fI0zoRr3SCSIjTC005jaokCP9");
-    stripe.redirectToCheckout({ sessionId: data.id });
-  } else {
-    document.getElementById("errorMessage").innerText = data.error;
-  }
-});
-
-drawCanvas();
-
-function selectPixel(x, y) {
+function togglePixelSelection(x, y) {
   const key = `${x},${y}`;
-  if (!claimedPixels.has(key) && !selectedPixels.includes(key)) {
+  if (claimedPixels.has(key)) return;
+
+  const index = selectedPixels.indexOf(key);
+  if (index !== -1) {
+    selectedPixels.splice(index, 1);
+  } else {
     selectedPixels.push(key);
-    pixelHistory.push([...selectedPixels]);
-    updateCounters();
-    drawGrid();
   }
+  pixelHistory.push([...selectedPixels]);
+  updateCounters();
+  drawGrid();
 }
 
 function updateCounters() {
   document.getElementById("pixelCount").innerText = selectedPixels.length;
+  document.getElementById("claimedPixels").innerText = claimedPixels.size;
   document.getElementById("totalPrice").innerText = selectedPixels.length;
 }
 
@@ -191,6 +165,7 @@ function drawGrid() {
   ctx.restore();
 }
 
+// Undo selection
 document.getElementById("undoButton").addEventListener("click", () => {
   if (pixelHistory.length > 0) {
     pixelHistory.pop();
@@ -200,6 +175,7 @@ document.getElementById("undoButton").addEventListener("click", () => {
   }
 });
 
+// Deselect all
 document.getElementById("deselectAllButton").addEventListener("click", () => {
   selectedPixels = [];
   pixelHistory = [];
@@ -207,6 +183,7 @@ document.getElementById("deselectAllButton").addEventListener("click", () => {
   drawGrid();
 });
 
+// Payment button
 document.getElementById("payButton").addEventListener("click", async () => {
   const errorDisplay = document.getElementById("errorMessage");
   errorDisplay.textContent = "";
@@ -238,12 +215,13 @@ document.getElementById("payButton").addEventListener("click", async () => {
   }
 });
 
+// Load claimed pixels
 async function fetchClaimedPixels() {
   try {
     const res = await fetch("/claimed-pixels");
     const data = await res.json();
     data.claimed.forEach(coord => claimedPixels.add(coord));
-    document.getElementById("claimedPixels").innerText = claimedPixels.size;
+    updateCounters();
     drawGrid();
   } catch (e) {
     console.error("Failed to fetch claimed pixels:", e);
@@ -251,3 +229,4 @@ async function fetchClaimedPixels() {
 }
 
 fetchClaimedPixels();
+drawGrid();
