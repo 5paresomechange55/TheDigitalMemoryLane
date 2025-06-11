@@ -60,10 +60,9 @@ def contact():
 def donation():
     return render_template('donation.html')
 
-# adjust claimed_pixels as key="x,y"
-@app.route('/claimed-pixels')
-def claimed_pixels_api():
-    return jsonify({'claimed': list(claimed_pixels.keys())})
+@app.route('/claimed-slots')
+def claimed_slots():
+    # return list of slot IDs already sold
 
 @app.route('/charity-votes')
 def get_charity_votes():
@@ -72,41 +71,31 @@ def get_charity_votes():
 @app.route('/create-checkout-session', methods=['POST'])
 def create_checkout_session():
     data = request.get_json()
-    selected_pixels = data.get("pixels", [])
+    selected = data.get('slots', [])
     charity = data.get('charity', 'charity1')
+    price_each = data.get('price', 50000)
+    quantity = len(selected)
 
-    if not selected_pixels:
-        return jsonify({'error': 'No pixels selected'}), 400
+    if quantity == 0:
+        return jsonify({'error': 'No slots selected'}), 400
 
-    session_id = f"session_{os.urandom(8).hex()}"
-    session_data = {
-        "pixels": selected_pixels,
-        "charity": charity
-    }
-
-    with open(f"data/{session_id}.json", 'w') as f:
-        json.dump(session_data, f)
-
-    try:
-        session = stripe.checkout.Session.create(
-            payment_method_types=['card'],
-            line_items=[{
-                'price_data': {
-                    'currency': 'usd',
-                    'product_data': {
-                        'name': 'Digital Memory Lane Pixels',
-                    },
-                    'unit_amount': 100,
-                },
-                'quantity': len(selected_pixels),
-            }],
-            mode='payment',
-            success_url=url_for('upload', session_id=session_id, _external=True),
-            cancel_url=url_for('index', _external=True),
-        )
-        return jsonify({'id': session.id})
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    session = stripe.checkout.Session.create(
+        payment_method_types=['card'],
+        line_items=[{
+            'price_data': {
+                'currency': 'usd',
+                'unit_amount': price_each,
+                'product_data': {'name': 'Timeline Memory Slot'},
+            },
+            'quantity': quantity
+        }],
+        mode='payment',
+        success_url=url_for('upload', session_id="timeline_"+os.urandom(8).hex(), _external=True),
+        cancel_url=url_for('index', _external=True)
+    )
+    # Save pending selections in data/
+    # ...
+    return jsonify({'id': session.id})
 
 @app.route('/upload/<session_id>', methods=['GET', 'POST'])
 def upload(session_id):
