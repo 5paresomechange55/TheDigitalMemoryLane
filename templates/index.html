@@ -8,91 +8,37 @@
   <script src="https://js.stripe.com/v3/"></script>
   <script defer src="/static/grid.js"></script>
   <style>
-    body {
-      font-family: 'Courier New', Courier, monospace;
-      background: linear-gradient(to right, #fff8dc, #ffebcd);
-      color: #4b2e2e;
-    }
-
-    #canvasContainer {
-      overflow: scroll;
-      max-height: 75vh;
-      border: 4px dashed #deb887;
-      background-color: #fef6e4;
-    }
-
-    canvas {
-      display: block;
-      margin: auto;
-      image-rendering: pixelated;
-      cursor: crosshair;
-    }
-
-    canvas {
-  width: 100%;
-  height: auto;
-  touch-action: none; /* Helps prevent scrolling interference on touch devices */
-}
-
-    ::-webkit-scrollbar {
-      width: 10px;
-    }
-    ::-webkit-scrollbar-thumb {
-      background: #c19a6b;
-    }
-
-    .btn {
-      background-color: #a0522d;
-      color: white;
-      padding: 0.75rem 1.5rem;
-      font-weight: bold;
-      border-radius: 9999px;
-      transition: background-color 0.3s;
-    }
-
-    .btn:hover {
-      background-color: #7b3f00;
-    }
-
-    .toolbar-link {
-      color: #4b2e2e;
-      font-weight: bold;
-    }
-
-    .toolbar-link:hover {
-      text-decoration: underline;
-      color: #8b4513;
-    }
+    body { font-family: 'Courier New', monospace; background: linear-gradient(to right,#fff8dc,#ffebcd); color:#4b2e2e; }
+    .toolbar-link { font-weight:bold; color:#4b2e2e; }
+    .toolbar-link:hover { text-decoration:underline;color:#8b4513; }
+    #grid { display:grid; grid-template-columns:repeat(1000,1px); grid-auto-rows:1px; border:4px dashed #deb887; background:#fef6e4; overflow:auto; max-height:75vh; }
+    .cell { width:1px; height:1px; background:#fff; }
+    .cell.selected { background:#ff6347; }
+    .cell.claimed { background:#999; }
   </style>
 </head>
 <body class="p-6">
-  <!-- Navigation Toolbar -->
-<nav class="flex justify-between items-center mb-8">
-  <h1 class="text-4xl font-bold text-yellow-900">🎞️ The Digital Memory Lane</h1>
-  <div class="space-x-6">
-    <a href="/" class="toolbar-link text-lg">Home</a>
-    <a href="/about" class="toolbar-link text-lg">About Us</a>
-    <a href="/contact" class="toolbar-link text-lg">Contact Us</a>
-    <a href="/donation" class="toolbar-link text-lg">Donation Station</a>
-  </div>
-</nav>
-  
-  <!-- Description -->
-  <div class="text-center mb-6">
-    <p class="text-xl italic text-gray-700">Buy a piece of online history — one nostalgic pixel at a time.</p>
-  </div>
+  <!-- Nav -->
+  <nav class="flex justify-between items-center mb-8">
+    <h1 class="text-4xl font-bold text-yellow-900">🎞️ The Digital Memory Lane</h1>
+    <div class="space-x-6">
+      <a href="/" class="toolbar-link">Home</a>
+      <a href="/about" class="toolbar-link">About Us</a>
+      <a href="/contact" class="toolbar-link">Contact Us</a>
+      <a href="/donation" class="toolbar-link">Donation Station</a>
+    </div>
+  </nav>
 
-  <!-- Pixel Tracker -->
-  <div class="flex justify-center gap-10 mb-4 text-lg" id="pixelCounter">
-    <p><strong>Selected Pixels:</strong> <span id="pixelCount">0</span></p>
-    <p><strong>Total Price:</strong> $<span id="totalPrice">0</span></p>
-    <p><strong>Claimed Pixels:</strong> <span id="claimedPixels">0</span> / <span id="totalPixels">3000000</span></p>
+  <!-- Info Bar -->
+  <div class="text-center mb-6 italic text-gray-700">Buy a piece of online history — one nostalgic pixel at a time.</div>
+  <div class="flex justify-center gap-10 mb-4 text-lg">
+    <p>Selected: <span id="pixelCount">0</span></p>
+    <p>Total: $<span id="totalPrice">0</span></p>
+    <p>Claimed: <span id="claimedPixels">0</span> / 3000000</p>
   </div>
-
-  <!-- Charity Selection -->
   <div class="flex justify-center mb-6">
-    <label for="charitySelect" class="mr-2 font-semibold">Vote for a Charity:</label>
-    <select id="charitySelect" class="border border-gray-400 px-2 py-1 rounded">
+    <label for="charitySelect" class="mr-2">Charity:</label>
+    <select id="charitySelect" class="border px-2 py-1 rounded">
       <option value="charity1">Charity 1</option>
       <option value="charity2">Charity 2</option>
       <option value="charity3">Charity 3</option>
@@ -100,24 +46,20 @@
     </select>
   </div>
 
-  <!-- Canvas -->
-  <div id="canvasContainer" class="rounded-md shadow-lg mb-6">
-    <canvas id="pixelCanvas" width="1000" height="3000" class="border"></canvas>
-  </div>
+  <!-- Grid -->
+  <div id="grid"></div>
 
   <!-- Buttons -->
-  <div class="flex flex-col items-center space-y-4 mb-6">
-    <button id="payButton" class="btn text-lg">Pay & Claim Pixels</button>
+  <div class="flex flex-col items-center space-y-4 my-6">
+    <button id="payButton" class="bg-yellow-700 hover:bg-yellow-800 text-white font-bold py-3 px-8 rounded-full shadow">Pay & Claim Pixels</button>
     <div class="space-x-4">
-      <button id="undoButton" class="btn text-sm">Undo</button>
-      <button id="deselectAllButton" class="btn text-sm">Deselect All</button>
+      <button id="undoButton" class="bg-yellow-700...">Undo</button>
+      <button id="deselectAllButton" class="bg-yellow-700...">Deselect All</button>
     </div>
-    <p id="errorMessage" class="text-red-600 mt-2 text-sm"></p>
+    <p id="errorMessage" class="text-red-600 text-sm"></p>
   </div>
 
   <!-- Footer -->
-  <footer class="text-center text-sm text-gray-600 mt-10">
-    <p>&copy; 2025 <a href="/" class="underline">TheDigitalMemoryLane.com</a> — Your moment in time, preserved forever.</p>
-  </footer>
+  <footer class="text-center text-sm text-gray-600 mt-10">&copy; 2025 TheDigitalMemoryLane.com</footer>
 </body>
 </html>
