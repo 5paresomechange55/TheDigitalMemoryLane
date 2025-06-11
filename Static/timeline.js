@@ -1,103 +1,96 @@
-console.log("Timeline lane loaded");
+const SLOT_COUNT = 5000;
+const SLOT_PRICE = 50000;  // in cents ($500)
+const STRIPE_PUBLIC_KEY = window.STRIPE_PUBLIC_KEY;
 
-const slots = [];
-const history = [];
-let selectedCount = 0;
+let selectedSlots = new Set();
+let history = [];
 
-const timeline = document.getElementById("timeline");
-const addSlotBtn = document.getElementById("addSlot");
-const payBtn = document.getElementById("payButton");
-const undoBtn = document.getElementById("undoButton");
-const clearBtn = document.getElementById("deselectAllButton");
-const charitySel = document.getElementById("charitySelect");
-const errorMsg = document.getElementById("errorMessage");
+const slotsContainer = document.getElementById('slots');
+const slotCountEl = document.getElementById('slotCount');
+const totalPriceEl = document.getElementById('totalPrice');
+const errorMsg = document.getElementById('errorMessage');
+const charitySelect = document.getElementById('charitySelect');
 
-function createCard(id, imageUrl) {
-  const div = document.createElement("div");
-  div.className = imageUrl ? "card claimed" : "card empty";
-  div.dataset.id = id;
-  div.innerHTML = imageUrl
-    ? `<img src="${imageUrl}" alt="Memory">`
-    : `<span>+ Slot</span>`;
-  div.onclick = () => {
-    if (imageUrl) return;
-    if (div.classList.contains("selected")) {
-      div.classList.remove("selected");
-      selectedCount--;
-    } else {
-      div.classList.add("selected");
-      history.push(div);
-      selectedCount++;
-    }
-    updateControls();
-  };
-  return div;
+function updateDisplay() {
+  slotCountEl.textContent = selectedSlots.size;
+  totalPriceEl.textContent = (selectedSlots.size * 500).toLocaleString();
 }
 
-function updateControls() {
-  payBtn.textContent = `Pay & Claim Slots ($${selectedCount})`;
+function createSlots() {
+  for (let i = 0; i < SLOT_COUNT; i++) {
+    const slot = document.createElement('div');
+    slot.className = 'slot available';
+    slot.dataset.id = i;
+    slot.style.top = i % 2 === 0 ? '-60px' : '0';
+    slot.onclick = () => toggleSlot(slot);
+    slotsContainer.appendChild(slot);
+  }
 }
 
-function loadSlots() {
-  fetch("/timeline-slots")
-    .then(r => r.json())
-    .then(data => {
-      timeline.innerHTML = "";
-      data.slots.forEach(slot => {
-        timeline.appendChild(createCard(slot.id, slot.image));
-      });
-    });
+function toggleSlot(slot) {
+  const id = slot.dataset.id;
+  if (slot.classList.contains('claimed')) return;
+
+  if (selectedSlots.has(id)) {
+    selectedSlots.delete(id);
+    slot.classList.remove('selected');
+    history.pop();
+  } else {
+    selectedSlots.add(id);
+    slot.classList.add('selected');
+    history.push(id);
+  }
+
+  updateDisplay();
 }
 
-addSlotBtn.onclick = () => {
-  const id = `new-${Date.now()}`;
-  const card = createCard(id, null);
-  card.classList.add("selected");
-  timeline.appendChild(card);
-  history.push(card);
-  selectedCount++;
-  updateControls();
-};
-
-undoBtn.onclick = () => {
+document.getElementById('undoButton').onclick = () => {
   const last = history.pop();
   if (last) {
-    last.classList.remove("selected");
-    selectedCount--;
-    updateControls();
+    selectedSlots.delete(last);
+    document.querySelector(`.slot[data-id="${last}"]`).classList.remove('selected');
   }
+  updateDisplay();
 };
 
-clearBtn.onclick = () => {
-  timeline.querySelectorAll(".selected").forEach(el => el.classList.remove("selected"));
-  history.length = 0;
-  selectedCount = 0;
-  updateControls();
+document.getElementById('clearButton').onclick = () => {
+  selectedSlots.forEach(id => document.querySelector(`.slot[data-id="${id}"]`).classList.remove('selected'));
+  selectedSlots.clear();
+  history = [];
+  updateDisplay();
 };
 
-payBtn.onclick = async () => {
-  errorMsg.textContent = "";
-  if (selectedCount === 0) {
-    errorMsg.textContent = "Select at least one slot";
+document.getElementById('payButton').onclick = async () => {
+  errorMsg.textContent = '';
+  if (selectedSlots.size === 0) {
+    errorMsg.textContent = 'Please select a slot.';
     return;
   }
 
-  const charity = charitySel.value;
-  const chosen = Array.from(timeline.querySelectorAll(".selected")).map(el => el.dataset.id);
-
   try {
-    const res = await fetch("/create-checkout-session", {
-      method: "POST",
-      headers: {"Content-Type":"application/json"},
-      body: JSON.stringify({ slots: chosen, charity })
+    const res = await fetch('/create-checkout-session', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        slots: Array.from(selectedSlots),
+        charity: charitySelect.value,
+        price: SLOT_PRICE
+      })
     });
+
     const data = await res.json();
-    if (data.error) errorMsg.textContent = data.error;
-    else Stripe(window.STRIPE_PUBLIC_KEY).redirectToCheckout({ sessionId: data.id });
+    if (data.error) {
+      errorMsg.textContent = data.error;
+      return;
+    }
+
+    const stripe = Stripe(STRIPE_PUBLIC_KEY);
+    const { error } = await stripe.redirectToCheckout({ sessionId: data.id });
+    if (error) errorMsg.textContent = error.message;
   } catch (e) {
-    errorMsg.textContent = "Error starting checkout";
+    errorMsg.textContent = 'Payment initiation error';
   }
 };
 
-// Initial load
-loadSlots();
+createSlots();
+updateDisplay();
