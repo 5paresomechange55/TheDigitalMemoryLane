@@ -72,9 +72,7 @@ def get_charity_votes():
 @app.route('/create-checkout-session', methods=['POST'])
 def create_checkout_session():
     data = request.get_json()
-    selected = data.get("pixels", [])
-# convert to strings
-claimed_pixels.update({f"{p[0]},{p[1]}": filename for p in selected})
+    selected_pixels = data.get("pixels", [])
     charity = data.get('charity', 'charity1')
 
     if not selected_pixels:
