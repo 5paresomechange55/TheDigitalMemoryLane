@@ -60,6 +60,7 @@ def contact():
 def donation():
     return render_template('donation.html')
 
+# adjust claimed_pixels as key="x,y"
 @app.route('/claimed-pixels')
 def claimed_pixels_api():
     return jsonify({'claimed': list(claimed_pixels.keys())})
