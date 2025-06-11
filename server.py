@@ -61,7 +61,7 @@ def donation():
     return render_template('donation.html')
 
 @app.route('/claimed-slots')
-def claimed_slots():
+def claimed_slots():)
     # return list of slot IDs already sold
 
 @app.route('/charity-votes')
