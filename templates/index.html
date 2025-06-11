@@ -2,23 +2,55 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>The Digital Memory Lane</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <script src="https://js.stripe.com/v3/"></script>
   <script defer src="/static/grid.js"></script>
   <style>
-    body { font-family: 'Courier New', monospace; background: linear-gradient(to right,#fff8dc,#ffebcd); color:#4b2e2e; }
-    .toolbar-link { font-weight:bold; color:#4b2e2e; }
-    .toolbar-link:hover { text-decoration:underline;color:#8b4513; }
-    #grid { display:grid; grid-template-columns:repeat(1000,1px); grid-auto-rows:1px; border:4px dashed #deb887; background:#fef6e4; overflow:auto; max-height:75vh; }
-    .cell { width:1px; height:1px; background:#fff; }
-    .cell.selected { background:#ff6347; }
-    .cell.claimed { background:#999; }
+    body {
+      font-family: 'Courier New', monospace;
+      background: linear-gradient(to right, #fff8dc, #ffebcd);
+      color: #4b2e2e;
+    }
+    .toolbar-link {
+      font-weight: bold;
+      color: #4b2e2e;
+    }
+    .toolbar-link:hover {
+      text-decoration: underline;
+      color: #8b4513;
+    }
+    #wrapper {
+      overflow: auto;
+      touch-action: pan-x pan-y;
+      -webkit-overflow-scrolling: touch;
+      border: 4px dashed #deb887;
+      background: #fef6e4;
+      max-height: 75vh;
+      max-width: 100%;
+    }
+    #grid {
+      display: grid;
+      grid-template-columns: repeat(1000, 1px);
+      grid-auto-rows: 1px;
+      position: relative;
+    }
+    .cell {
+      width: 1px;
+      height: 1px;
+      background: #fff;
+    }
+    .cell.selected {
+      background: #ff6347;
+    }
+    .cell.claimed {
+      background: #999;
+    }
   </style>
 </head>
 <body class="p-6">
-  <!-- Nav -->
+  <!-- Toolbar -->
   <nav class="flex justify-between items-center mb-8">
     <h1 class="text-4xl font-bold text-yellow-900">🎞️ The Digital Memory Lane</h1>
     <div class="space-x-6">
@@ -29,15 +61,15 @@
     </div>
   </nav>
 
-  <!-- Info Bar -->
-  <div class="text-center mb-6 italic text-gray-700">Buy a piece of online history — one nostalgic pixel at a time.</div>
-  <div class="flex justify-center gap-10 mb-4 text-lg">
-    <p>Selected: <span id="pixelCount">0</span></p>
-    <p>Total: $<span id="totalPrice">0</span></p>
-    <p>Claimed: <span id="claimedPixels">0</span> / 3000000</p>
+  <!-- Info -->
+  <p class="text-center italic text-gray-700 mb-6">Buy a piece of online history — one nostalgic pixel at a time.</p>
+  <div class="flex justify-center gap-6 mb-4 text-lg">
+    <div>Selected: <span id="pixelCount">0</span></div>
+    <div>Total: $<span id="totalPrice">0</span></div>
+    <div>Claimed: <span id="claimedPixels">0</span> / 3000000</div>
   </div>
   <div class="flex justify-center mb-6">
-    <label for="charitySelect" class="mr-2">Charity:</label>
+    <label for="charitySelect" class="mr-2 font-semibold">Vote for Charity:</label>
     <select id="charitySelect" class="border px-2 py-1 rounded">
       <option value="charity1">Charity 1</option>
       <option value="charity2">Charity 2</option>
@@ -46,15 +78,17 @@
     </select>
   </div>
 
-  <!-- Grid -->
-  <div id="grid"></div>
+  <!-- Grid of pixels -->
+  <div id="wrapper">
+    <div id="grid"></div>
+  </div>
 
-  <!-- Buttons -->
+  <!-- Controls -->
   <div class="flex flex-col items-center space-y-4 my-6">
-    <button id="payButton" class="bg-yellow-700 hover:bg-yellow-800 text-white font-bold py-3 px-8 rounded-full shadow">Pay & Claim Pixels</button>
+    <button id="payButton" class="bg-yellow-700 hover:bg-yellow-800 text-white font-bold py-3 px-6 rounded-full shadow">Pay & Claim Pixels</button>
     <div class="space-x-4">
-      <button id="undoButton" class="bg-yellow-700...">Undo</button>
-      <button id="deselectAllButton" class="bg-yellow-700...">Deselect All</button>
+      <button id="undoButton" class="bg-yellow-700 hover:bg-yellow-800 text-white font-bold py-2 px-4 rounded">Undo</button>
+      <button id="deselectAllButton" class="bg-yellow-700 hover:bg-yellow-800 text-white font-bold py-2 px-4 rounded">Deselect All</button>
     </div>
     <p id="errorMessage" class="text-red-600 text-sm"></p>
   </div>
