@@ -14,23 +14,23 @@ stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 app = Flask(__name__)
 CORS(app)
 
-# File paths and config
-PIXELS_FILE = 'data/claimed_pixels.json'
+# Config
+PIXELS_FILE = 'data/claimed_slots.json'
 VOTES_FILE = 'data/charity_votes.json'
 UPLOAD_FOLDER = 'static/uploads'
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-# Ensure required folders exist
+# Ensure folders exist
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs('data', exist_ok=True)
 
-# Load claimed pixels
+# Load claimed slots
 if os.path.exists(PIXELS_FILE):
     with open(PIXELS_FILE, 'r') as f:
-        claimed_pixels = json.load(f)
+        claimed_slots = json.load(f)
 else:
-    claimed_pixels = {}
+    claimed_slots = {}
 
 # Load charity votes
 if os.path.exists(VOTES_FILE):
@@ -61,8 +61,8 @@ def donation():
     return render_template('donation.html')
 
 @app.route('/claimed-slots')
-def claimed_slots():)
-    # return list of slot IDs already sold
+def get_claimed_slots():
+    return jsonify({'claimed': list(claimed_slots.keys())})
 
 @app.route('/charity-votes')
 def get_charity_votes():
@@ -73,11 +73,20 @@ def create_checkout_session():
     data = request.get_json()
     selected = data.get('slots', [])
     charity = data.get('charity', 'charity1')
-    price_each = data.get('price', 50000)
+    price_each = 50000  # $500 in cents
     quantity = len(selected)
 
     if quantity == 0:
         return jsonify({'error': 'No slots selected'}), 400
+
+    session_id = f"timeline_{os.urandom(8).hex()}"
+    session_data = {
+        "slots": selected,
+        "charity": charity
+    }
+
+    with open(f"data/{session_id}.json", 'w') as f:
+        json.dump(session_data, f)
 
     session = stripe.checkout.Session.create(
         payment_method_types=['card'],
@@ -90,11 +99,10 @@ def create_checkout_session():
             'quantity': quantity
         }],
         mode='payment',
-        success_url=url_for('upload', session_id="timeline_"+os.urandom(8).hex(), _external=True),
+        success_url=url_for('upload', session_id=session_id, _external=True),
         cancel_url=url_for('index', _external=True)
     )
-    # Save pending selections in data/
-    # ...
+
     return jsonify({'id': session.id})
 
 @app.route('/upload/<session_id>', methods=['GET', 'POST'])
@@ -120,32 +128,21 @@ def upload(session_id):
             with open(session_file, 'r') as f:
                 session_data = json.load(f)
 
-            selected_pixels = session_data.get("pixels", [])
+            selected_slots = session_data.get("slots", [])
             charity = session_data.get("charity", "charity1")
 
-            if selected_pixels:
-                xs = [p[0] for p in selected_pixels]
-                ys = [p[1] for p in selected_pixels]
-                width = max(xs) - min(xs) + 1
-                height = max(ys) - min(ys) + 1
+            for slot in selected_slots:
+                claimed_slots[str(slot)] = filename
 
-                img = Image.open(filepath)
-                img = img.resize((width, height))
-                img.save(filepath, optimize=True, quality=85)
+            with open(PIXELS_FILE, 'w') as f:
+                json.dump(claimed_slots, f)
 
-                for pixel in selected_pixels:
-                    claimed_pixels[str(pixel)] = filename
+            charity_votes[charity] = charity_votes.get(charity, 0) + len(selected_slots)
+            with open(VOTES_FILE, 'w') as f:
+                json.dump(charity_votes, f)
 
-                with open(PIXELS_FILE, 'w') as f:
-                    json.dump(claimed_pixels, f)
-
-                # Update charity vote count
-                charity_votes[charity] = charity_votes.get(charity, 0) + 1
-                with open(VOTES_FILE, 'w') as f:
-                    json.dump(charity_votes, f)
-
-                os.remove(session_file)
-                return redirect(url_for('index'))
+            os.remove(session_file)
+            return redirect(url_for('index'))
 
     return render_template('upload.html', session_id=session_id)
 
