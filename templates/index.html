@@ -1,93 +1,73 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>The Digital Memory Lane</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet"/>
   <style>
-    body {
-      background: #fef3c7;
-      font-family: 'Courier New', Courier, monospace;
-    }
-
+    body { background: #f0e6d6; font-family: 'Courier New', monospace; }
     .slot {
-      width: 50px;
-      height: 50px;
-      background-color: #fbbf24;
-      border: 1px dashed #000;
+      width: 50px; height: 50px;
+      background: #a67c52;
+      border: 2px solid #5c3a1f;
+      display: inline-flex;
+      align-items: center; justify-content: center;
+      color: #fff;
+      font-size: 9px;
+      position: relative;
       cursor: pointer;
-      position: absolute;
-      overflow: hidden;
+      transition: background-color 0.2s, transform 0.2s;
     }
-
+    .slot:hover { background: #b68b5f; transform: scale(1.05); }
+    .slot.selected { background: #ffda9e; }
+    .slot.claimed {
+      background: transparent;
+      border: 1px solid #888;
+      pointer-events: none;
+    }
     .slot.claimed img {
-      width: 100%;
-      height: 100%;
       object-fit: cover;
-      display: block;
+      width: 100%; height: 100%;
     }
-
     .timeline-wrapper {
-      overflow-x: scroll;
-      overflow-y: hidden;
-      white-space: nowrap;
-      width: 100%;
-      height: 300px;
-      position: relative;
-      border-top: 4px solid #000;
-      border-bottom: 4px solid #000;
+      overflow-x: scroll; white-space: nowrap;
+      border-top: 3px solid #5c3a1f; border-bottom: 3px solid #5c3a1f;
+      height: 200px; padding: 20px 0;
     }
-
-    .slot-container {
-      width: 5000px;
-      position: relative;
-      height: 100%;
-    }
-
-    .timeline-line {
-      height: 4px;
-      background-color: #000;
-      position: absolute;
-      top: 50%;
-      width: 100%;
-      transform: translateY(-50%);
-    }
+    .slot-container { width: 5000px; position: relative; }
+    nav ul { background: #5c3a1f; color: #fff; }
+    nav a { color: #ffda9e; }
   </style>
 </head>
-<body class="text-center">
-  <!-- Toolbar -->
-  <nav class="bg-yellow-300 py-4 shadow-lg">
-    <ul class="flex justify-center space-x-8 font-bold text-lg">
-      <li><a href="/" class="hover:underline">Home</a></li>
-      <li><a href="/about" class="hover:underline">About</a></li>
-      <li><a href="/contact" class="hover:underline">Contact</a></li>
-      <li><a href="/donation" class="hover:underline">Donation Station</a></li>
+<body>
+  <nav>
+    <ul class="flex justify-center space-x-8 font-bold py-4">
+      <li><a href="/">Home</a></li>
+      <li><a href="/about">About</a></li>
+      <li><a href="/contact">Contact</a></li>
+      <li><a href="/donation">Donation Station</a></li>
     </ul>
   </nav>
 
-  <h1 class="text-4xl font-bold mt-6 mb-4 text-yellow-900">The Digital Memory Lane</h1>
-  <p class="mb-6 text-yellow-800">Select a slot, preserve your memory, and support a cause.</p>
+  <h1 class="text-4xl text-center mt-6 mb-4 text-yellow-900">The Digital Memory Lane</h1>
+  <p class="text-center mb-4 text-yellow-800">Scroll, select your memory slots, and immortalize them.</p>
 
   <div class="timeline-wrapper mx-auto">
-    <div class="slot-container" id="slotContainer">
-      <div class="timeline-line"></div>
-    </div>
+    <div id="slotContainer" class="slot-container"></div>
   </div>
 
-  <div class="my-6">
-    <label for="charity" class="block font-semibold">Choose a charity:</label>
-    <select id="charity" class="mt-2 p-2 border rounded">
+  <div class="my-6 text-center">
+    <select id="charity" class="border p-2 mr-4">
       <option value="charity1">Charity 1</option>
       <option value="charity2">Charity 2</option>
       <option value="charity3">Charity 3</option>
       <option value="charity4">Charity 4</option>
     </select>
+    <button id="payButton" class="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-6 rounded">
+      Pay <span id="totalCost">$0</span>
+    </button>
   </div>
-
-  <button id="payButton" class="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-6 rounded">
-    Pay $500
-  </button>
 
   <script src="https://js.stripe.com/v3/"></script>
   <script src="timeline.js"></script>
