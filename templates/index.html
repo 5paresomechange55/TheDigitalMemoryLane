@@ -63,6 +63,44 @@
     <p id="errorMessage" class="text-red-600 text-sm"></p>
   </div>
 
+<style>
+  #timeline-container {
+    width: 5000px; /* Adjust as needed */
+    height: 300px;
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: scroll;
+    background: #f4f4f4;
+    padding: 40px 0;
+  }
+
+  .slot {
+    width: 100px;
+    height: 100px;
+    margin: 0 10px;
+    background-color: #e0e0e0;
+    border: 2px solid #aaa;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: monospace;
+    font-size: 12px;
+    user-select: none;
+    cursor: pointer;
+  }
+
+  .slot.selected {
+    background-color: #4ade80;
+    border-color: #15803d;
+  }
+
+  .slot.claimed {
+    background-color: #9ca3af;
+    border-color: #6b7280;
+    pointer-events: none;
+  }
+</style>
+  
   <footer class="text-center text-sm text-gray-600 mt-10">© 2025 TheDigitalMemoryLane.com</footer>
 </body>
 </html>
