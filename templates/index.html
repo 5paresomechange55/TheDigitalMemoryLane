@@ -4,43 +4,64 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>The Digital Memory Lane</title>
-  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet"/>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <style>
-    body { background: #f0e6d6; font-family: 'Courier New', monospace; }
+    body {
+      background: #f0e6d6;
+      font-family: 'Courier New', monospace;
+    }
+    nav ul {
+      background: #5c3a1f;
+    }
+    nav a {
+      color: #ffd580;
+    }
+    .timeline-wrapper {
+      overflow-x: scroll;
+      white-space: nowrap;
+      height: 220px;
+      position: relative;
+      border-top: 3px solid #5c3a1f;
+      margin: 2rem 0;
+    }
+    .slot-container {
+      position: relative;
+      height: 100%;
+    }
     .slot {
-      width: 50px; height: 50px;
+      width: 50px;
+      height: 50px;
       background: #a67c52;
       border: 2px solid #5c3a1f;
-      display: inline-flex;
-      align-items: center; justify-content: center;
-      color: #fff;
-      font-size: 9px;
-      position: relative;
+      color: white;
+      font-size: 10px;
+      text-align: center;
+      line-height: 50px;
+      position: absolute;
       cursor: pointer;
       transition: background-color 0.2s, transform 0.2s;
     }
-    .slot:hover { background: #b68b5f; transform: scale(1.05); }
-    .slot.selected { background: #ffda9e; }
+    .slot:hover {
+      background: #b68b5f;
+      transform: scale(1.1);
+    }
+    .slot.selected {
+      background: #ffebcd;
+      color: #5c3a1f;
+    }
     .slot.claimed {
       background: transparent;
       border: 1px solid #888;
-      pointer-events: none;
+      cursor: default;
     }
     .slot.claimed img {
+      width: 100%;
+      height: 100%;
       object-fit: cover;
-      width: 100%; height: 100%;
     }
-    .timeline-wrapper {
-      overflow-x: scroll; white-space: nowrap;
-      border-top: 3px solid #5c3a1f; border-bottom: 3px solid #5c3a1f;
-      height: 200px; padding: 20px 0;
-    }
-    .slot-container { width: 5000px; position: relative; }
-    nav ul { background: #5c3a1f; color: #fff; }
-    nav a { color: #ffda9e; }
   </style>
 </head>
-<body>
+<body class="text-center">
   <nav>
     <ul class="flex justify-center space-x-8 font-bold py-4">
       <li><a href="/">Home</a></li>
@@ -50,14 +71,14 @@
     </ul>
   </nav>
 
-  <h1 class="text-4xl text-center mt-6 mb-4 text-yellow-900">The Digital Memory Lane</h1>
-  <p class="text-center mb-4 text-yellow-800">Scroll, select your memory slots, and immortalize them.</p>
+  <h1 class="text-4xl font-bold text-yellow-900">The Digital Memory Lane</h1>
+  <p class="mt-2 text-yellow-800">Scroll below, click a square to claim your memory slot.</p>
 
-  <div class="timeline-wrapper mx-auto">
+  <div class="timeline-wrapper">
     <div id="slotContainer" class="slot-container"></div>
   </div>
 
-  <div class="my-6 text-center">
+  <div class="mb-4">
     <select id="charity" class="border p-2 mr-4">
       <option value="charity1">Charity 1</option>
       <option value="charity2">Charity 2</option>
@@ -69,7 +90,7 @@
     </button>
   </div>
 
-  <script src="https://js.stripe.com/v3/"></script>
+  <script src="https://js.stripe.com/v3"></script>
   <script src="timeline.js"></script>
 </body>
 </html>
