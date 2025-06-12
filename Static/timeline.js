@@ -1,65 +1,70 @@
-const totalSlots = 5000;
-const timeline = document.getElementById("timeline");
-const selectedSlots = new Set();
-const stripe = Stripe("pk_test_51RTDqT2c0Glb9QyZNKJzKHIZMfZXmAHBPzFVyxhz22a2cPmsOmzEswfHCYsd68z8HXbeASNV8fI0zoRr3SCSIjTC005jaokCP9");
+const slotContainer = document.getElementById('slotContainer');
+const stripe = Stripe('YOUR_STRIPE_PUBLISHABLE_KEY'); // Will be injected by Flask
+let selectedSlot = null;
+let claimedSlots = new Set();
 
-function renderTimeline(claimed = {}) {
-  timeline.innerHTML = '';
-  for (let i = 0; i < totalSlots; i++) {
-    const slot = document.createElement("div");
-    slot.classList.add("slot");
-    slot.dataset.id = i;
+const SLOT_SIZE = 50;
+const SLOT_COUNT = 5000;
+const SLOT_PRICE = 50000; // in cents
 
-    if (claimed[i]) {
-      slot.classList.add("claimed");
-      const img = document.createElement("img");
-      img.src = claimed[i];
+// Fetch claimed slots
+fetch('/claimed-slots')
+  .then(res => res.json())
+  .then(data => {
+    data.claimed.forEach(slot => claimedSlots.add(parseInt(slot)));
+    renderSlots();
+  });
+
+function renderSlots() {
+  for (let i = 0; i < SLOT_COUNT; i++) {
+    const slot = document.createElement('div');
+    slot.className = 'slot';
+    slot.dataset.slot = i;
+
+    const x = i * SLOT_SIZE;
+    const y = i % 2 === 0 ? 75 : 175;
+
+    slot.style.left = `${x}px`;
+    slot.style.top = `${y}px`;
+
+    if (claimedSlots.has(i)) {
+      slot.classList.add('claimed');
+      const img = document.createElement('img');
+      img.src = `/static/uploads/${i}.jpg`; // Expected slot image file
       slot.appendChild(img);
     } else {
-      slot.addEventListener("click", () => {
-        if (selectedSlots.has(i)) {
-          selectedSlots.delete(i);
-          slot.classList.remove("selected");
-        } else {
-          selectedSlots.add(i);
-          slot.classList.add("selected");
+      slot.addEventListener('click', () => {
+        if (selectedSlot !== null) {
+          document.querySelector(`[data-slot="${selectedSlot}"]`).classList.remove('bg-green-400');
         }
+        selectedSlot = i;
+        slot.classList.add('bg-green-400');
       });
     }
 
-    timeline.appendChild(slot);
+    slotContainer.appendChild(slot);
   }
 }
 
-document.getElementById("payButton").addEventListener("click", async () => {
-  const charity = document.getElementById("charity").value;
-  if (selectedSlots.size === 0) {
-    alert("Select at least one slot.");
+document.getElementById('payButton').addEventListener('click', () => {
+  if (selectedSlot === null) {
+    alert('Please select a slot to continue.');
     return;
   }
 
-  const res = await fetch("/create-checkout-session", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
+  const charity = document.getElementById('charity').value;
+
+  fetch('/create-checkout-session', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      slots: Array.from(selectedSlots),
-      charity,
-      price: 50000
+      slots: [selectedSlot],
+      charity: charity,
+      price: SLOT_PRICE
     })
+  })
+  .then(res => res.json())
+  .then(data => {
+    return stripe.redirectToCheckout({ sessionId: data.id });
   });
-
-  const data = await res.json();
-  if (data.id) {
-    stripe.redirectToCheckout({ sessionId: data.id });
-  } else {
-    alert("Checkout failed.");
-  }
 });
-
-async function fetchClaimed() {
-  const res = await fetch("/claimed-slots");
-  const claimed = await res.json();
-  renderTimeline(claimed);
-}
-
-fetchClaimed();
