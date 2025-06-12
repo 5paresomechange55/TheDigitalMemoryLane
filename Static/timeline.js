@@ -78,6 +78,25 @@ document.getElementById('payButton').onclick = async () => {
       })
     });
 
+document.addEventListener('DOMContentLoaded', () => {
+  const container = document.getElementById('timeline-container');
+  const TOTAL_SLOTS = 5000;
+
+  for (let i = 0; i < TOTAL_SLOTS; i++) {
+    const slot = document.createElement('div');
+    slot.className = 'slot';
+    slot.innerText = `#${i + 1}`;
+    if (i % 2 === 0) {
+      slot.style.marginTop = '0px';
+    } else {
+      slot.style.marginTop = '60px';
+    }
+    container.appendChild(slot);
+  }
+
+  container.addEventListener('touchstart', () => {}, { passive: true });
+});
+    
     const data = await res.json();
     if (data.error) {
       errorMsg.textContent = data.error;
