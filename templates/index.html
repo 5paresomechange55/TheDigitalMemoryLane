@@ -4,103 +4,109 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>The Digital Memory Lane</title>
-  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-  <script src="https://js.stripe.com/v3/"></script>
-  <script defer src="/static/timeline.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    body { font-family:'Courier New',monospace; background: linear-gradient(to right,#fff8dc,#ffebcd); color:#4b2e2e; }
-    .toolbar-link { font-weight:bold; color:#4b2e2e; }
-    .toolbar-link:hover { text-decoration:underline; color:#8b4513; }
-    #timeline-container { overflow-x:auto; white-space:nowrap; padding:1rem; }
-    #line { position:relative; height:2px; background:#deb887; margin-top:4rem; }
-    .slot { display:inline-block; width:80px; height:80px; margin:0 10px; position:relative; cursor:pointer; }
-    .slot span { font-size:0.75rem; text-align:center; display:block; color:#555; }
-    .slot img { width:100%; height:auto; border-radius:4px; }
-    .slot.available::before { content:"+"; font-size:2rem; color:#888; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); }
-    .slot.selected { outline:4px solid #ff6347; }
+    body {
+      background-color: #fef3c7;
+      font-family: 'Courier New', monospace;
+    }
+
+    .timeline-container {
+      overflow-x: auto;
+      white-space: nowrap;
+      scroll-behavior: smooth;
+      animation: scrollTimeline 20s linear infinite;
+    }
+
+    @keyframes scrollTimeline {
+      0% { scroll-left: 0; }
+      100% { scroll-left: 1000px; }
+    }
+
+    .slot {
+      width: 80px;
+      height: 80px;
+      background-color: #fff;
+      border: 2px dashed #333;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .slot:hover {
+      transform: scale(1.1);
+      box-shadow: 0 0 10px #444;
+    }
+
+    .slot.selected {
+      background-color: #93c5fd;
+      border-color: #1d4ed8;
+      animation: bounce 0.4s;
+    }
+
+    @keyframes bounce {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.2); }
+      100% { transform: scale(1); }
+    }
+
+    .timeline {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      gap: 10px;
+      padding: 2rem;
+      position: relative;
+    }
+
+    .timeline::before {
+      content: '';
+      position: absolute;
+      height: 4px;
+      background-color: #444;
+      top: 50%;
+      left: 0;
+      right: 0;
+      transform: translateY(-50%);
+      z-index: 0;
+    }
+
+    .slot-wrapper {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      position: relative;
+      z-index: 1;
+    }
+
+    .slot-wrapper.above {
+      flex-direction: column-reverse;
+    }
   </style>
 </head>
-<body class="p-6">
+<body class="text-center">
+  <header class="py-6">
+    <h1 class="text-4xl font-bold text-yellow-800">🕰️ The Digital Memory Lane</h1>
+    <p class="text-sm mt-2">Select a memory slot below to preserve your legacy.</p>
+  </header>
 
-  <nav class="flex justify-between mb-8 items-center">
-    <h1 class="text-4xl font-bold text-yellow-900">🎞️ The Digital Memory Lane</h1>
-    <div class="space-x-6">
-      <a href="/" class="toolbar-link">Home</a>
-      <a href="/about" class="toolbar-link">About Us</a>
-      <a href="/contact" class="toolbar-link">Contact Us</a>
-      <a href="/donation" class="toolbar-link">Donation Station</a>
-    </div>
-  </nav>
-
-  <p class="text-center italic text-gray-700 mb-6">Choose your slot on the Memory Lane</p>
-
-  <div class="flex justify-center gap-8 mb-6">
-    <p>Selected: <span id="slotCount">0</span></p>
-    <p>Total: $<span id="totalPrice">0</span></p>
-    <div>
-      <label for="charitySelect">Vote Charity:</label>
-      <select id="charitySelect" class="border px-2 py-1 rounded ml-2">
-        <option value="charity1">Charity 1</option>
-        <option value="charity2">Charity 2</option>
-        <option value="charity3">Charity 3</option>
-        <option value="charity4">Charity 4</option>
-      </select>
-    </div>
+  <div id="timelineWrapper" class="timeline-container">
+    <div id="timeline" class="timeline"></div>
   </div>
 
-  <div id="timeline-container">
-    <div id="slots" class="inline-flex items-center">
-      <div id="line"></div>
-    </div>
+  <div class="mt-6">
+    <select id="charitySelect" class="p-2 border rounded">
+      <option value="charity1">Charity 1</option>
+      <option value="charity2">Charity 2</option>
+      <option value="charity3">Charity 3</option>
+      <option value="charity4">Charity 4</option>
+    </select>
+    <button id="payButton" class="ml-4 px-4 py-2 bg-blue-600 text-white rounded">Pay $500</button>
   </div>
 
-  <div class="flex flex-col items-center my-6 space-y-4">
-    <button id="payButton" class="bg-yellow-700 hover:bg-yellow-800 text-white font-bold py-3 px-8 rounded-full">Pay & Claim Slots</button>
-    <div class="space-x-4">
-      <button id="undoButton" class="bg-yellow-700 text-white font-bold py-2 px-4 rounded">Undo</button>
-      <button id="clearButton" class="bg-yellow-700 text-white font-bold py-2 px-4 rounded">Clear All</button>
-    </div>
-    <p id="errorMessage" class="text-red-600 text-sm"></p>
-  </div>
-
-<style>
-  #timeline-container {
-    width: 5000px; /* Adjust as needed */
-    height: 300px;
-    display: flex;
-    flex-wrap: nowrap;
-    overflow-x: scroll;
-    background: #f4f4f4;
-    padding: 40px 0;
-  }
-
-  .slot {
-    width: 100px;
-    height: 100px;
-    margin: 0 10px;
-    background-color: #e0e0e0;
-    border: 2px solid #aaa;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-family: monospace;
-    font-size: 12px;
-    user-select: none;
-    cursor: pointer;
-  }
-
-  .slot.selected {
-    background-color: #4ade80;
-    border-color: #15803d;
-  }
-
-  .slot.claimed {
-    background-color: #9ca3af;
-    border-color: #6b7280;
-    pointer-events: none;
-  }
-</style>
-  
-  <footer class="text-center text-sm text-gray-600 mt-10">© 2025 TheDigitalMemoryLane.com</footer>
+  <script src="https://js.stripe.com/v3/"></script>
+  <script src="timeline.js"></script>
 </body>
 </html>
