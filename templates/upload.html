@@ -1,36 +1,74 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8"/>
+  <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Upload – The Digital Memory Lane</title>
-  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet"/>
+  <title>Upload Your Memory</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <style>
-    body { background: #f0e6d6; font-family: 'Courier New', monospace; }
-    .upload-box {
-      background: #fffbe6; border: 2px dashed #5c3a1f;
+    body {
+      background-color: #f4f1ee;
+      font-family: 'Courier New', monospace;
+    }
+    .nostalgic-box {
+      background-color: #fff7eb;
+      border: 3px dashed #a97450;
+      padding: 2rem;
+      margin-top: 2rem;
+    }
+    .upload-preview {
+      max-width: 300px;
+      margin: 1rem auto;
+      border: 2px solid #a97450;
+      padding: 0.5rem;
+      background-color: #fff;
     }
   </style>
 </head>
-<body>
-  <nav class="bg-yellow-300 py-4 mb-6">
-    <ul class="flex justify-center space-x-8 font-bold text-lg">
-      <li><a href="/">Home</a></li>
-      <li><a href="/about">About</a></li>
-      <li><a href="/contact">Contact</a></li>
-      <li><a href="/donation">Donation Station</a></li>
-    </ul>
-  </nav>
+<body class="text-center">
 
-  <div class="max-w-md mx-auto upload-box p-6 rounded">
-    <h1 class="text-2xl font-bold mb-4">Upload Your Memory</h1>
-    <p class="mb-6">Post-purchase: upload one image per slot. <br/>Scale to 50×50 and embed forever.</p>
-    <form method="POST" enctype="multipart/form-data">
-      <input type="file" name="image" required class="block mx-auto mb-4"/>
-      <button type="submit" class="bg-yellow-500 hover:bg-yellow-600 text-white px-6 py-2 rounded">
-        Upload
-      </button>
-    </form>
-  </div>
+  <!-- Header -->
+  <header class="p-4 text-white bg-yellow-900 flex justify-between items-center">
+    <h1 class="text-2xl">🕰️ The Digital Memory Lane</h1>
+    <nav>
+      <a href="/" class="px-3">Home</a>
+      <a href="/about" class="px-3">About</a>
+      <a href="/contact" class="px-3">Contact</a>
+      <a href="/donation" class="px-3">Donation Station</a>
+    </nav>
+  </header>
+
+  <main class="max-w-xl mx-auto">
+    <h2 class="text-2xl mt-6 font-semibold text-yellow-900">Upload Your Memory</h2>
+    <p class="mt-2 text-gray-700">Please upload one image that will represent your claimed memory slot(s). Each image will be permanently displayed in your purchased slot on the timeline.</p>
+
+    <div class="nostalgic-box mt-6">
+      <form method="POST" enctype="multipart/form-data">
+        <input type="file" name="image" accept="image/*" class="block w-full p-2 border mb-4" onchange="previewImage(event)" required>
+        <div id="preview" class="upload-preview hidden">
+          <img id="preview-img" src="#" alt="Image Preview" class="w-full">
+        </div>
+        <button type="submit" class="mt-4 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
+          Upload Memory
+        </button>
+      </form>
+    </div>
+  </main>
+
+  <script>
+    function previewImage(event) {
+      const input = event.target;
+      const preview = document.getElementById('preview');
+      const img = document.getElementById('preview-img');
+      if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          img.src = e.target.result;
+          preview.classList.remove('hidden');
+        };
+        reader.readAsDataURL(input.files[0]);
+      }
+    }
+  </script>
 </body>
 </html>
