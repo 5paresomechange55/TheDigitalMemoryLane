@@ -1,115 +1,65 @@
-const SLOT_COUNT = 5000;
-const SLOT_PRICE = 50000;  // in cents ($500)
-const STRIPE_PUBLIC_KEY = window.STRIPE_PUBLIC_KEY;
+const totalSlots = 5000;
+const timeline = document.getElementById("timeline");
+const selectedSlots = new Set();
+const stripe = Stripe("pk_test_51RTDqT2c0Glb9QyZNKJzKHIZMfZXmAHBPzFVyxhz22a2cPmsOmzEswfHCYsd68z8HXbeASNV8fI0zoRr3SCSIjTC005jaokCP9");
 
-let selectedSlots = new Set();
-let history = [];
-
-const slotsContainer = document.getElementById('slots');
-const slotCountEl = document.getElementById('slotCount');
-const totalPriceEl = document.getElementById('totalPrice');
-const errorMsg = document.getElementById('errorMessage');
-const charitySelect = document.getElementById('charitySelect');
-
-function updateDisplay() {
-  slotCountEl.textContent = selectedSlots.size;
-  totalPriceEl.textContent = (selectedSlots.size * 500).toLocaleString();
-}
-
-function createSlots() {
-  for (let i = 0; i < SLOT_COUNT; i++) {
-    const slot = document.createElement('div');
-    slot.className = 'slot available';
+function renderTimeline(claimed = {}) {
+  timeline.innerHTML = '';
+  for (let i = 0; i < totalSlots; i++) {
+    const slot = document.createElement("div");
+    slot.classList.add("slot");
     slot.dataset.id = i;
-    slot.style.top = i % 2 === 0 ? '-60px' : '0';
-    slot.onclick = () => toggleSlot(slot);
-    slotsContainer.appendChild(slot);
+
+    if (claimed[i]) {
+      slot.classList.add("claimed");
+      const img = document.createElement("img");
+      img.src = claimed[i];
+      slot.appendChild(img);
+    } else {
+      slot.addEventListener("click", () => {
+        if (selectedSlots.has(i)) {
+          selectedSlots.delete(i);
+          slot.classList.remove("selected");
+        } else {
+          selectedSlots.add(i);
+          slot.classList.add("selected");
+        }
+      });
+    }
+
+    timeline.appendChild(slot);
   }
 }
 
-function toggleSlot(slot) {
-  const id = slot.dataset.id;
-  if (slot.classList.contains('claimed')) return;
-
-  if (selectedSlots.has(id)) {
-    selectedSlots.delete(id);
-    slot.classList.remove('selected');
-    history.pop();
-  } else {
-    selectedSlots.add(id);
-    slot.classList.add('selected');
-    history.push(id);
-  }
-
-  updateDisplay();
-}
-
-document.getElementById('undoButton').onclick = () => {
-  const last = history.pop();
-  if (last) {
-    selectedSlots.delete(last);
-    document.querySelector(`.slot[data-id="${last}"]`).classList.remove('selected');
-  }
-  updateDisplay();
-};
-
-document.getElementById('clearButton').onclick = () => {
-  selectedSlots.forEach(id => document.querySelector(`.slot[data-id="${id}"]`).classList.remove('selected'));
-  selectedSlots.clear();
-  history = [];
-  updateDisplay();
-};
-
-document.getElementById('payButton').onclick = async () => {
-  errorMsg.textContent = '';
+document.getElementById("payButton").addEventListener("click", async () => {
+  const charity = document.getElementById("charity").value;
   if (selectedSlots.size === 0) {
-    errorMsg.textContent = 'Please select a slot.';
+    alert("Select at least one slot.");
     return;
   }
 
-  try {
-    const res = await fetch('/create-checkout-session', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({
-        slots: Array.from(selectedSlots),
-        charity: charitySelect.value,
-        price: SLOT_PRICE
-      })
-    });
+  const res = await fetch("/create-checkout-session", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      slots: Array.from(selectedSlots),
+      charity,
+      price: 50000
+    })
+  });
 
-document.addEventListener('DOMContentLoaded', () => {
-  const container = document.getElementById('timeline-container');
-  const TOTAL_SLOTS = 5000;
-
-  for (let i = 0; i < TOTAL_SLOTS; i++) {
-    const slot = document.createElement('div');
-    slot.className = 'slot';
-    slot.innerText = `#${i + 1}`;
-    if (i % 2 === 0) {
-      slot.style.marginTop = '0px';
-    } else {
-      slot.style.marginTop = '60px';
-    }
-    container.appendChild(slot);
+  const data = await res.json();
+  if (data.id) {
+    stripe.redirectToCheckout({ sessionId: data.id });
+  } else {
+    alert("Checkout failed.");
   }
-
-  container.addEventListener('touchstart', () => {}, { passive: true });
 });
-    
-    const data = await res.json();
-    if (data.error) {
-      errorMsg.textContent = data.error;
-      return;
-    }
 
-    const stripe = Stripe(STRIPE_PUBLIC_KEY);
-    const { error } = await stripe.redirectToCheckout({ sessionId: data.id });
-    if (error) errorMsg.textContent = error.message;
-  } catch (e) {
-    errorMsg.textContent = 'Payment initiation error';
-  }
-};
+async function fetchClaimed() {
+  const res = await fetch("/claimed-slots");
+  const claimed = await res.json();
+  renderTimeline(claimed);
+}
 
-createSlots();
-updateDisplay();
+fetchClaimed();
