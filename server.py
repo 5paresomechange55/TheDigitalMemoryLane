@@ -14,55 +14,37 @@ stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 app = Flask(__name__)
 CORS(app)
 
-# Config
-PIXELS_FILE = 'data/claimed_slots.json'
-VOTES_FILE = 'data/charity_votes.json'
 UPLOAD_FOLDER = 'static/uploads'
+CLAIMED_FILE = 'data/claimed_slots.json'
+VOTES_FILE = 'data/charity_votes.json'
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-# Ensure folders exist
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs('data', exist_ok=True)
 
-# Load claimed slots
-if os.path.exists(PIXELS_FILE):
-    with open(PIXELS_FILE, 'r') as f:
+# Load or initialize claimed slots
+if os.path.exists(CLAIMED_FILE):
+    with open(CLAIMED_FILE, 'r') as f:
         claimed_slots = json.load(f)
 else:
     claimed_slots = {}
 
-# Load charity votes
+# Load or initialize charity votes
 if os.path.exists(VOTES_FILE):
     with open(VOTES_FILE, 'r') as f:
         charity_votes = json.load(f)
 else:
-    charity_votes = {
-        "charity1": 0,
-        "charity2": 0,
-        "charity3": 0,
-        "charity4": 0
-    }
+    charity_votes = {f"charity{i}": 0 for i in range(1, 5)}
 
 @app.route('/')
 def index():
     return render_template('index.html', stripe_public_key=os.getenv("STRIPE_PUBLISHABLE_KEY"))
 
-@app.route('/about')
-def about():
-    return render_template('about.html')
-
-@app.route('/contact')
-def contact():
-    return render_template('contact.html')
-
-@app.route('/donation')
-def donation():
-    return render_template('donation.html')
-
 @app.route('/claimed-slots')
 def get_claimed_slots():
-    return jsonify({'claimed': list(claimed_slots.keys())})
+    # Return { slot_id: image_path }
+    return jsonify(claimed_slots)
 
 @app.route('/charity-votes')
 def get_charity_votes():
@@ -71,22 +53,18 @@ def get_charity_votes():
 @app.route('/create-checkout-session', methods=['POST'])
 def create_checkout_session():
     data = request.get_json()
-    selected = data.get('slots', [])
+    slots = data.get('slots', [])
     charity = data.get('charity', 'charity1')
-    price_each = 50000  # $500 in cents
-    quantity = len(selected)
+    price_each = data.get('price', 50000)
 
-    if quantity == 0:
+    if not slots:
         return jsonify({'error': 'No slots selected'}), 400
 
-    session_id = f"timeline_{os.urandom(8).hex()}"
-    session_data = {
-        "slots": selected,
-        "charity": charity
-    }
+    session_id = f"session_{os.urandom(8).hex()}"
+    session_file = f"data/{session_id}.json"
 
-    with open(f"data/{session_id}.json", 'w') as f:
-        json.dump(session_data, f)
+    with open(session_file, 'w') as f:
+        json.dump({"slots": slots, "charity": charity}, f)
 
     session = stripe.checkout.Session.create(
         payment_method_types=['card'],
@@ -96,7 +74,7 @@ def create_checkout_session():
                 'unit_amount': price_each,
                 'product_data': {'name': 'Timeline Memory Slot'},
             },
-            'quantity': quantity
+            'quantity': len(slots)
         }],
         mode='payment',
         success_url=url_for('upload', session_id=session_id, _external=True),
@@ -107,9 +85,8 @@ def create_checkout_session():
 
 @app.route('/upload/<session_id>', methods=['GET', 'POST'])
 def upload(session_id):
-    session_file = f"data/{session_id}.json"
-
-    if not os.path.exists(session_file):
+    session_path = f"data/{session_id}.json"
+    if not os.path.exists(session_path):
         return "Invalid session", 400
 
     if request.method == 'POST':
@@ -121,27 +98,29 @@ def upload(session_id):
             return "No selected file", 400
 
         if image and allowed_file(image.filename):
-            filename = secure_filename(image.filename)
+            filename = secure_filename(f"{session_id}_{image.filename}")
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             image.save(filepath)
 
-            with open(session_file, 'r') as f:
+            with open(session_path, 'r') as f:
                 session_data = json.load(f)
 
-            selected_slots = session_data.get("slots", [])
+            slots = session_data.get("slots", [])
             charity = session_data.get("charity", "charity1")
 
-            for slot in selected_slots:
-                claimed_slots[str(slot)] = filename
+            # Assign image to all slots
+            for slot_id in slots:
+                claimed_slots[str(slot_id)] = f"/static/uploads/{filename}"
 
-            with open(PIXELS_FILE, 'w') as f:
+            with open(CLAIMED_FILE, 'w') as f:
                 json.dump(claimed_slots, f)
 
-            charity_votes[charity] = charity_votes.get(charity, 0) + len(selected_slots)
+            # Count charity vote
+            charity_votes[charity] = charity_votes.get(charity, 0) + 1
             with open(VOTES_FILE, 'w') as f:
                 json.dump(charity_votes, f)
 
-            os.remove(session_file)
+            os.remove(session_path)
             return redirect(url_for('index'))
 
     return render_template('upload.html', session_id=session_id)
