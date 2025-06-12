@@ -1,25 +1,32 @@
+console.log("🎞️ timeline.js loaded");
+
 const stripe = Stripe('YOUR_STRIPE_PUBLISHABLE_KEY');
 const container = document.getElementById('slotContainer');
-const totalCostEl = document.getElementById('totalCost');
-const SLOT_COUNT = 500;
-const SLOT_WIDTH = 60; // slot + spacing
+console.log("slotContainer:", container);
+
+const SLOT_COUNT = 200;
+const SLOT_WIDTH = 60;
+const PRICE = 50000;
 let selected = new Set();
-const PRICE_PER_SLOT = 50000; // cents
 
 async function loadClaimed() {
-  const resp = await fetch('/claimed-slots');
-  const data = await resp.json();
-  return new Set(data.claimed.map(n => parseInt(n)));
+  console.log("Fetching claimed slots...");
+  const res = await fetch('/claimed-slots');
+  const js = await res.json();
+  console.log("Claimed response:", js);
+  return new Set(js.claimed.map(n => parseInt(n)));
 }
 
 function updateCost() {
-  const cost = (selected.size * PRICE_PER_SLOT) / 100;
-  totalCostEl.innerText = `$${cost}`;
+  const total = (selected.size * PRICE) / 100;
+  document.getElementById('totalCost').innerText = `$${total}`;
 }
 
 async function renderSlots() {
+  if (!container) return console.error("slotContainer is missing!");
   const claimed = await loadClaimed();
-  container.style.width = `${SLOT_COUNT * SLOT_WIDTH}px`;
+  const totalWidth = SLOT_COUNT * SLOT_WIDTH;
+  container.style.minWidth = totalWidth + 'px';
 
   for (let i = 0; i < SLOT_COUNT; i++) {
     const slot = document.createElement('div');
@@ -34,7 +41,7 @@ async function renderSlots() {
       img.src = `/static/uploads/${i}.jpg?${Date.now()}`;
       slot.appendChild(img);
     } else {
-      slot.innerText = 'Click to\nselect';
+      slot.innerText = 'Select';
       slot.addEventListener('click', () => {
         if (selected.has(i)) {
           selected.delete(i);
@@ -46,27 +53,11 @@ async function renderSlots() {
         updateCost();
       });
     }
-
     container.appendChild(slot);
   }
+  console.log("Rendered slots:", container.children.length);
 }
 
-document.getElementById('payButton').addEventListener('click', async () => {
-  if (selected.size === 0) return alert('Choose at least one slot.');
-
-  const charity = document.getElementById('charity').value;
-  const resp = await fetch('/create-checkout-session', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      slots: Array.from(selected),
-      charity: charity,
-      price: PRICE_PER_SLOT
-    })
-  });
-  const data = await resp.json();
-  if (data.id) stripe.redirectToCheckout({ sessionId: data.id });
-  else alert('Error creating checkout.');
-});
+document.getElementById('payButton').onclick = () => renderSlots();
 
 renderSlots();
