@@ -1,44 +1,36 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Upload Your Memory</title>
+  <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Upload – The Digital Memory Lane</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet"/>
   <style>
-    body {
-      background: #fef3c7;
-      font-family: 'Courier New', Courier, monospace;
-    }
+    body { background: #f0e6d6; font-family: 'Courier New', monospace; }
     .upload-box {
-      background-color: #fff;
-      border: 2px dashed #000;
+      background: #fffbe6; border: 2px dashed #5c3a1f;
     }
   </style>
 </head>
-<body class="text-center">
-
-  <!-- Toolbar -->
-  <nav class="bg-yellow-300 py-4 shadow-lg">
+<body>
+  <nav class="bg-yellow-300 py-4 mb-6">
     <ul class="flex justify-center space-x-8 font-bold text-lg">
-      <li><a href="/" class="hover:underline">Home</a></li>
-      <li><a href="/about" class="hover:underline">About</a></li>
-      <li><a href="/contact" class="hover:underline">Contact</a></li>
-      <li><a href="/donation" class="hover:underline">Donation Station</a></li>
+      <li><a href="/">Home</a></li>
+      <li><a href="/about">About</a></li>
+      <li><a href="/contact">Contact</a></li>
+      <li><a href="/donation">Donation Station</a></li>
     </ul>
   </nav>
 
-  <div class="mt-12 mx-auto max-w-xl p-6 upload-box">
-    <h1 class="text-3xl font-bold mb-4">Upload Your Memory</h1>
-    <p class="mb-6 text-yellow-800">Your slot is secured. Upload your photo to preserve this moment.</p>
-
+  <div class="max-w-md mx-auto upload-box p-6 rounded">
+    <h1 class="text-2xl font-bold mb-4">Upload Your Memory</h1>
+    <p class="mb-6">Post-purchase: upload one image per slot. <br/>Scale to 50×50 and embed forever.</p>
     <form method="POST" enctype="multipart/form-data">
-      <input type="file" name="image" accept="image/*" class="block mx-auto mb-4"/>
-      <button type="submit" class="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-6 rounded">
+      <input type="file" name="image" required class="block mx-auto mb-4"/>
+      <button type="submit" class="bg-yellow-500 hover:bg-yellow-600 text-white px-6 py-2 rounded">
         Upload
       </button>
     </form>
   </div>
-
 </body>
 </html>
