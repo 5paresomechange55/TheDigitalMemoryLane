@@ -1,70 +1,71 @@
+const stripe = Stripe('YOUR_STRIPE_PUBLIC_KEY');
 const slotContainer = document.getElementById('slotContainer');
-const stripe = Stripe('YOUR_STRIPE_PUBLISHABLE_KEY'); // Will be injected by Flask
-let selectedSlot = null;
-let claimedSlots = new Set();
-
-const SLOT_SIZE = 50;
+const totalCostEl = document.getElementById('totalCost');
 const SLOT_COUNT = 5000;
-const SLOT_PRICE = 50000; // in cents
+const SLOT_SIZE = 50;
+const PRICE_PER_SLOT = 50000; // cents
+let selectedSlots = new Set();
 
-// Fetch claimed slots
-fetch('/claimed-slots')
-  .then(res => res.json())
-  .then(data => {
-    data.claimed.forEach(slot => claimedSlots.add(parseInt(slot)));
-    renderSlots();
-  });
+async function fetchClaimed() {
+  const res = await fetch('/claimed-slots');
+  const data = await res.json();
+  return new Set(data.claimed.map(n => parseInt(n)));
+}
 
-function renderSlots() {
+function updateCost() {
+  const cost = (selectedSlots.size * PRICE_PER_SLOT) / 100;
+  totalCostEl.innerText = `$${cost}`;
+}
+
+async function renderSlots() {
+  const claimed = await fetchClaimed();
   for (let i = 0; i < SLOT_COUNT; i++) {
     const slot = document.createElement('div');
     slot.className = 'slot';
-    slot.dataset.slot = i;
+    slot.dataset.idx = i;
+    slot.style.left = `${i * (SLOT_SIZE + 5)}px`;
 
-    const x = i * SLOT_SIZE;
-    const y = i % 2 === 0 ? 75 : 175;
-
-    slot.style.left = `${x}px`;
-    slot.style.top = `${y}px`;
-
-    if (claimedSlots.has(i)) {
+    if (claimed.has(i)) {
       slot.classList.add('claimed');
       const img = document.createElement('img');
-      img.src = `/static/uploads/${i}.jpg`; // Expected slot image file
+      img.src = `/static/uploads/${i}.jpg`;
       slot.appendChild(img);
     } else {
+      slot.innerText = 'click to select\ntime slot';
       slot.addEventListener('click', () => {
-        if (selectedSlot !== null) {
-          document.querySelector(`[data-slot="${selectedSlot}"]`).classList.remove('bg-green-400');
+        if (selectedSlots.has(i)) {
+          selectedSlots.delete(i);
+          slot.classList.remove('selected');
+        } else {
+          selectedSlots.add(i);
+          slot.classList.add('selected');
         }
-        selectedSlot = i;
-        slot.classList.add('bg-green-400');
+        updateCost();
       });
     }
-
     slotContainer.appendChild(slot);
   }
 }
 
-document.getElementById('payButton').addEventListener('click', () => {
-  if (selectedSlot === null) {
-    alert('Please select a slot to continue.');
-    return;
-  }
+document.getElementById('payButton').addEventListener('click', async () => {
+  if (selectedSlots.size === 0) return alert('Select at least one slot.');
 
-  const charity = document.getElementById('charity').value;
-
-  fetch('/create-checkout-session', {
+  const res = await fetch('/create-checkout-session', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      slots: [selectedSlot],
-      charity: charity,
-      price: SLOT_PRICE
+      slots: [...selectedSlots],
+      charity: document.getElementById('charity').value,
+      price: PRICE_PER_SLOT
     })
-  })
-  .then(res => res.json())
-  .then(data => {
-    return stripe.redirectToCheckout({ sessionId: data.id });
   });
+
+  const data = await res.json();
+  if (data.id) {
+    stripe.redirectToCheckout({ sessionId: data.id });
+  } else {
+    alert('Checkout error.');
+  }
 });
+
+renderSlots();
