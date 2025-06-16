@@ -6,7 +6,21 @@ const timelineLine = document.getElementById("timeline-line");
 const payButton = document.getElementById("payButton");
 const clearButton = document.getElementById("clearSelection");
 const charityDropdown = document.getElementById("charity");
+const totalSlots = 5000;
+const slotsAbove = document.getElementById("slots-above");
+const slotsBelow = document.getElementById("slots-below");
 
+for (let i = 0; i < totalSlots; i++) {
+  const slot = document.createElement("div");
+  slot.className = "w-[50px] h-[50px] border-2 border-yellow-900 bg-yellow-100 hover:bg-yellow-300 cursor-pointer text-[10px] flex items-center justify-center text-center text-yellow-900";
+  slot.innerText = "Click\nto select";
+  slot.dataset.slotId = i;
+  
+  // Alternate between above and below
+  (i % 2 === 0 ? slotsAbove : slotsBelow).appendChild(slot);
+  
+  // Add your click/select/deselect logic here...
+}
 let selectedSlots = new Set();
 
 // Utility to create each slot
