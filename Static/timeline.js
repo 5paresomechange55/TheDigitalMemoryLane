@@ -1,94 +1,119 @@
-document.addEventListener('DOMContentLoaded', () => {
-  const timeline = document.getElementById('timeline');
-  const payButton = document.getElementById('payButton');
-  const charitySelect = document.getElementById('charitySelect');
+const TOTAL_SLOTS = 5000;
+const SLOT_SIZE = 64; // px
+const PRICE_PER_SLOT = 50000; // $500 in cents
+const timeline = document.getElementById("timeline");
+const timelineLine = document.getElementById("timeline-line");
+const payButton = document.getElementById("payButton");
+const clearButton = document.getElementById("clearSelection");
+const charityDropdown = document.getElementById("charity");
 
-  const TOTAL_SLOTS = 5000;
-  const selectedSlots = new Set();
+let selectedSlots = new Set();
 
-  // Create slots
+// Utility to create each slot
+function createSlot(index) {
+  const slot = document.createElement("div");
+  slot.className = `
+    slot relative z-10 w-[${SLOT_SIZE}px] h-[${SLOT_SIZE}px] border-2 
+    border-yellow-900 bg-yellow-100 text-[10px] text-center 
+    flex items-center justify-center cursor-pointer 
+    hover:bg-yellow-300 transition
+  `;
+  slot.textContent = "Click to select time slot";
+  slot.dataset.id = index;
+
+  const offset = index % 2 === 0 ? -SLOT_SIZE - 10 : SLOT_SIZE + 10;
+  slot.style.transform = `translateY(${offset}px)`;
+  slot.style.position = "relative";
+  return slot;
+}
+
+// Inject all slots into timeline
+function renderTimeline() {
+  timeline.innerHTML = "";
+  timeline.appendChild(timelineLine);
+
   for (let i = 0; i < TOTAL_SLOTS; i++) {
-    const slot = document.createElement('div');
-    slot.classList.add('slot');
-    slot.dataset.slotId = i;
-
-    slot.innerText = "Click to select\ntime slot";
-    slot.style.whiteSpace = "pre-line";
-
-    // Alternate position: top or bottom
-    slot.style.alignSelf = (i % 2 === 0) ? "flex-start" : "flex-end";
-
-    // Add event listener
-    slot.addEventListener('click', () => {
-      if (slot.classList.contains('selected')) {
-        slot.classList.remove('selected');
-        selectedSlots.delete(i);
-      } else {
-        slot.classList.add('selected');
-        selectedSlots.add(i);
-      }
-    });
-
+    const slot = createSlot(i);
+    slot.addEventListener("click", () => toggleSlot(slot));
     timeline.appendChild(slot);
   }
 
-  // Handle Stripe Checkout
-  payButton.addEventListener('click', async () => {
-    if (selectedSlots.size === 0) {
-      alert('Please select at least one time slot.');
-      return;
-    }
-
-    const selectedArray = Array.from(selectedSlots);
-    const charity = charitySelect.value;
-
-    try {
-      const response = await fetch('/create-checkout-session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          slots: selectedArray,
-          charity: charity,
-          price: 50000, // $500.00 per slot
-        }),
-      });
-
-      const data = await response.json();
-
-      if (data.id) {
-        const stripe = Stripe(data.publicKey || '<YOUR_PUBLISHABLE_KEY>');
-        stripe.redirectToCheckout({ sessionId: data.id });
-      } else {
-        alert('Error starting checkout. Please try again.');
-      }
-    } catch (err) {
-      console.error(err);
-      alert('Checkout failed.');
-    }
-  });
-
-  // Pre-fill claimed slots
-  fetch('/claimed-slots')
+  // Load claimed slots
+  fetch("/claimed-slots")
     .then(res => res.json())
-    .then(claimed => {
-      claimed.forEach(slot => {
-        const el = document.querySelector(`[data-slot-id="${slot.id}"]`);
-        if (el) {
-          if (slot.image) {
-            const img = document.createElement('img');
-            img.src = slot.image;
-            img.alt = "Uploaded memory";
-            img.className = "w-full h-full object-cover";
-            el.innerHTML = '';
-            el.appendChild(img);
-          } else {
-            el.classList.add('bg-gray-600');
-            el.innerText = "Claimed";
-          }
-          el.classList.remove('slot');
-          el.classList.remove('selected');
-          el.style.pointerEvents = 'none';
+    .then(data => {
+      data.forEach(slotId => {
+        const claimedSlot = document.querySelector(`.slot[data-id="${slotId}"]`);
+        if (claimedSlot) {
+          claimedSlot.classList.add("bg-yellow-700", "text-white", "cursor-default");
+          claimedSlot.textContent = "";
+          claimedSlot.removeEventListener("click", () => toggleSlot(claimedSlot));
+          const img = document.createElement("img");
+          img.src = `/static/uploads/${slotId}.jpg`; // assumes uploaded image named after slotId
+          img.className = "w-full h-full object-cover";
+          claimedSlot.appendChild(img);
         }
       });
     });
+}
+
+// Toggle selection
+function toggleSlot(slot) {
+  const id = slot.dataset.id;
+  if (selectedSlots.has(id)) {
+    selectedSlots.delete(id);
+    slot.classList.remove("bg-yellow-300");
+    slot.textContent = "Click to select time slot";
+  } else {
+    selectedSlots.add(id);
+    slot.classList.add("bg-yellow-300");
+    slot.textContent = `Selected (#${id})`;
+  }
+  updatePayButton();
+}
+
+// Update pay button text
+function updatePayButton() {
+  const count = selectedSlots.size;
+  payButton.textContent = `Pay & Upload ($${count * 500})`;
+}
+
+// Stripe checkout
+payButton.addEventListener("click", () => {
+  if (selectedSlots.size === 0) return alert("Select at least one slot.");
+
+  fetch("/create-checkout-session", {
+    method: "POST",
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      slots: Array.from(selectedSlots),
+      price: PRICE_PER_SLOT,
+      charity: charityDropdown.value
+    })
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.id) {
+      const stripe = Stripe(STRIPE_PUBLIC_KEY);
+      stripe.redirectToCheckout({ sessionId: data.id });
+    } else {
+      alert("Error creating Stripe session");
+    }
+  });
 });
+
+// Deselect all
+clearButton.addEventListener("click", () => {
+  selectedSlots.forEach(id => {
+    const slot = document.querySelector(`.slot[data-id="${id}"]`);
+    if (slot) {
+      slot.classList.remove("bg-yellow-300");
+      slot.textContent = "Click to select time slot";
+    }
+  });
+  selectedSlots.clear();
+  updatePayButton();
+});
+
+// Initial render
+document.addEventListener("DOMContentLoaded", renderTimeline);
