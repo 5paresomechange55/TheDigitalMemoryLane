@@ -2,20 +2,18 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>The Digital Memory Lane</title>
+  <script src="https://js.stripe.com/v3/"></script>
+  <script defer src="/static/timeline.js"></script>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <style>
-    body {
-      font-family: 'Courier New', monospace;
-      background-color: #f4f1ee;
-    }
     .slot {
       width: 50px;
       height: 50px;
-      background-color: #8b5e3c;
-      margin: 10px;
-      border: 2px solid #4b2e1e;
+      background-color: #a0522d; /* nostalgic brown */
+      margin: 4px;
+      border: 2px solid #654321;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -23,54 +21,66 @@
       color: white;
       text-align: center;
       cursor: pointer;
+      transition: background-color 0.2s;
     }
     .slot:hover {
-      background-color: #a97450;
+      background-color: #8b4513;
     }
     .slot.selected {
-      background-color: #c38a5f;
-      border-color: #d4a373;
+      background-color: #fbbf24; /* golden yellow highlight */
+      color: black;
     }
-    .timeline-track {
-      height: 5px;
-      background-color: #8b5e3c;
-      margin: 40px 0;
+    .timeline-line {
       width: 100%;
+      height: 4px;
+      background-color: #8b4513;
+      margin: 16px 0;
     }
   </style>
 </head>
-<body class="text-center">
-  <header class="p-4 text-white bg-yellow-900 flex justify-between items-center">
-    <h1 class="text-2xl">🕰️ The Digital Memory Lane</h1>
-    <nav>
-      <a href="/" class="px-3">Home</a>
-      <a href="/about" class="px-3">About</a>
-      <a href="/contact" class="px-3">Contact</a>
-      <a href="/donation" class="px-3">Donation Station</a>
-    </nav>
-  </header>
+<body class="bg-yellow-50 font-serif">
 
-  <section class="my-6">
-    <div class="overflow-x-scroll whitespace-nowrap" style="width: 100%;">
-      <div id="timeline-container" class="flex items-center justify-start px-4 relative" style="min-width: 6000px;">
-        <div class="timeline-track absolute left-0 right-0"></div>
-      </div>
+  <!-- Toolbar -->
+  <nav class="bg-yellow-200 p-4 flex justify-between items-center shadow-md">
+    <div class="text-xl font-bold text-brown-700">The Digital Memory Lane</div>
+    <div class="space-x-4">
+      <a href="/" class="text-brown-800 hover:underline">Home</a>
+      <a href="/about" class="text-brown-800 hover:underline">About</a>
+      <a href="/contact" class="text-brown-800 hover:underline">Contact</a>
+      <a href="/donation" class="text-brown-800 hover:underline">Donation Station</a>
     </div>
-    <div class="mt-4">
-      <label for="charity" class="mr-2">Choose a Charity:</label>
-      <select id="charity" class="p-2 border">
+  </nav>
+
+  <main class="p-6">
+    <h1 class="text-3xl font-bold text-center text-brown-700 mb-4">Preserve Your Memories on the Timeline</h1>
+    <p class="text-center text-gray-700 mb-6">Scroll, select a time slot, and upload a memory that lasts forever.</p>
+
+    <!-- Charity Dropdown -->
+    <div class="flex justify-center mb-6">
+      <label class="mr-2 text-gray-800 font-semibold">Choose a Charity:</label>
+      <select id="charitySelect" class="border border-gray-300 rounded p-1">
         <option value="charity1">Charity 1</option>
         <option value="charity2">Charity 2</option>
         <option value="charity3">Charity 3</option>
         <option value="charity4">Charity 4</option>
       </select>
     </div>
-    <div class="my-4">
-      <button id="pay-button" class="px-4 py-2 bg-green-600 text-white rounded">Pay</button>
-    </div>
-  </section>
 
-  <script src="https://js.stripe.com/v3/"></script>
-  <script src="/static/timeline.js"></script>
+    <!-- Timeline Container -->
+    <div class="overflow-x-auto border-2 border-yellow-400 rounded-lg p-4 bg-yellow-100">
+      <div id="timeline" class="flex space-x-4" style="min-width: 5000px;">
+        <!-- Slots will be generated here by JS -->
+      </div>
+    </div>
+
+    <!-- Pay Button -->
+    <div class="flex justify-center mt-6">
+      <button id="payButton"
+              class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded shadow">
+        Pay for Selected Slots
+      </button>
+    </div>
+  </main>
+
 </body>
 </html>
