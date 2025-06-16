@@ -1,57 +1,94 @@
-const totalSlots = 5000;
-const timelineContainer = document.getElementById('timeline-container');
-const stripe = Stripe('pk_test_...'); // replace with your actual public key
-let selectedSlots = [];
+document.addEventListener('DOMContentLoaded', () => {
+  const timeline = document.getElementById('timeline');
+  const payButton = document.getElementById('payButton');
+  const charitySelect = document.getElementById('charitySelect');
 
-function createSlot(id, above = true) {
-  const slot = document.createElement('div');
-  slot.className = 'slot';
-  slot.textContent = 'click to select time slot';
-  slot.dataset.id = id;
-  slot.style.position = 'relative';
-  slot.style.top = above ? '-60px' : '60px';
+  const TOTAL_SLOTS = 5000;
+  const selectedSlots = new Set();
 
-  slot.addEventListener('click', () => {
-    slot.classList.toggle('selected');
-    const index = selectedSlots.indexOf(id);
-    if (index > -1) {
-      selectedSlots.splice(index, 1);
-    } else {
-      selectedSlots.push(id);
-    }
-  });
+  // Create slots
+  for (let i = 0; i < TOTAL_SLOTS; i++) {
+    const slot = document.createElement('div');
+    slot.classList.add('slot');
+    slot.dataset.slotId = i;
 
-  return slot;
-}
+    slot.innerText = "Click to select\ntime slot";
+    slot.style.whiteSpace = "pre-line";
 
-fetch('/claimed-slots')
-  .then(res => res.json())
-  .then(claimed => {
-    for (let i = 0; i < totalSlots; i++) {
-      if (claimed[i]) {
-        const img = document.createElement('img');
-        img.src = `/static/uploads/${claimed[i]}`;
-        img.className = 'slot';
-        timelineContainer.appendChild(img);
+    // Alternate position: top or bottom
+    slot.style.alignSelf = (i % 2 === 0) ? "flex-start" : "flex-end";
+
+    // Add event listener
+    slot.addEventListener('click', () => {
+      if (slot.classList.contains('selected')) {
+        slot.classList.remove('selected');
+        selectedSlots.delete(i);
       } else {
-        const slot = createSlot(i, i % 2 === 0);
-        timelineContainer.appendChild(slot);
+        slot.classList.add('selected');
+        selectedSlots.add(i);
       }
+    });
+
+    timeline.appendChild(slot);
+  }
+
+  // Handle Stripe Checkout
+  payButton.addEventListener('click', async () => {
+    if (selectedSlots.size === 0) {
+      alert('Please select at least one time slot.');
+      return;
+    }
+
+    const selectedArray = Array.from(selectedSlots);
+    const charity = charitySelect.value;
+
+    try {
+      const response = await fetch('/create-checkout-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          slots: selectedArray,
+          charity: charity,
+          price: 50000, // $500.00 per slot
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.id) {
+        const stripe = Stripe(data.publicKey || '<YOUR_PUBLISHABLE_KEY>');
+        stripe.redirectToCheckout({ sessionId: data.id });
+      } else {
+        alert('Error starting checkout. Please try again.');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Checkout failed.');
     }
   });
 
-document.getElementById('pay-button').addEventListener('click', () => {
-  const charity = document.getElementById('charity').value;
-  fetch('/create-checkout-session', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      slots: selectedSlots,
-      charity: charity,
-      price: 50000
-    })
-  })
+  // Pre-fill claimed slots
+  fetch('/claimed-slots')
     .then(res => res.json())
-    .then(data => stripe.redirectToCheckout({ sessionId: data.id }))
-    .catch(console.error);
+    .then(claimed => {
+      claimed.forEach(slot => {
+        const el = document.querySelector(`[data-slot-id="${slot.id}"]`);
+        if (el) {
+          if (slot.image) {
+            const img = document.createElement('img');
+            img.src = slot.image;
+            img.alt = "Uploaded memory";
+            img.className = "w-full h-full object-cover";
+            el.innerHTML = '';
+            el.appendChild(img);
+          } else {
+            el.classList.add('bg-gray-600');
+            el.innerText = "Claimed";
+          }
+          el.classList.remove('slot');
+          el.classList.remove('selected');
+          el.style.pointerEvents = 'none';
+        }
+      });
+    });
 });
