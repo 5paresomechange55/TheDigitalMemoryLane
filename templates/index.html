@@ -1,86 +1,67 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="bg-yellow-50 text-gray-900">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>The Digital Memory Lane</title>
   <script src="https://js.stripe.com/v3/"></script>
-  <script defer src="/static/timeline.js"></script>
+  <script src="timeline.js" defer></script>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-  <style>
-    .slot {
-      width: 50px;
-      height: 50px;
-      background-color: #a0522d; /* nostalgic brown */
-      margin: 4px;
-      border: 2px solid #654321;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 10px;
-      color: white;
-      text-align: center;
-      cursor: pointer;
-      transition: background-color 0.2s;
-    }
-    .slot:hover {
-      background-color: #8b4513;
-    }
-    .slot.selected {
-      background-color: #fbbf24; /* golden yellow highlight */
-      color: black;
-    }
-    .timeline-line {
-      width: 100%;
-      height: 4px;
-      background-color: #8b4513;
-      margin: 16px 0;
-    }
-  </style>
 </head>
-<body class="bg-yellow-50 font-serif">
-
+<body class="font-mono">
   <!-- Toolbar -->
-  <nav class="bg-yellow-200 p-4 flex justify-between items-center shadow-md">
-    <div class="text-xl font-bold text-brown-700">The Digital Memory Lane</div>
-    <div class="space-x-4">
-      <a href="/" class="text-brown-800 hover:underline">Home</a>
-      <a href="/about" class="text-brown-800 hover:underline">About</a>
-      <a href="/contact" class="text-brown-800 hover:underline">Contact</a>
-      <a href="/donation" class="text-brown-800 hover:underline">Donation Station</a>
-    </div>
-  </nav>
+  <header class="bg-yellow-900 text-white py-4 px-6 shadow">
+    <nav class="flex justify-between items-center">
+      <h1 class="text-2xl tracking-wide">📸 The Digital Memory Lane</h1>
+      <div class="space-x-4 text-sm">
+        <a href="/" class="hover:underline">Home</a>
+        <a href="/about" class="hover:underline">About</a>
+        <a href="/contact" class="hover:underline">Contact</a>
+        <a href="/donation" class="hover:underline">Donation Station</a>
+      </div>
+    </nav>
+  </header>
 
-  <main class="p-6">
-    <h1 class="text-3xl font-bold text-center text-brown-700 mb-4">Preserve Your Memories on the Timeline</h1>
-    <p class="text-center text-gray-700 mb-6">Scroll, select a time slot, and upload a memory that lasts forever.</p>
-
-    <!-- Charity Dropdown -->
-    <div class="flex justify-center mb-6">
-      <label class="mr-2 text-gray-800 font-semibold">Choose a Charity:</label>
-      <select id="charitySelect" class="border border-gray-300 rounded p-1">
-        <option value="charity1">Charity 1</option>
-        <option value="charity2">Charity 2</option>
-        <option value="charity3">Charity 3</option>
-        <option value="charity4">Charity 4</option>
-      </select>
+  <!-- Main Content -->
+  <main class="p-6 space-y-6">
+    <div class="text-center">
+      <h2 class="text-xl font-bold mb-2">Scroll through time, select a slot, preserve your memory.</h2>
+      <p class="text-sm text-gray-700">Each time slot is $500. Once claimed, you can upload a photo to live on the timeline forever.</p>
     </div>
 
-    <!-- Timeline Container -->
-    <div class="overflow-x-auto border-2 border-yellow-400 rounded-lg p-4 bg-yellow-100">
-      <div id="timeline" class="flex space-x-4" style="min-width: 5000px;">
-        <!-- Slots will be generated here by JS -->
+    <!-- Timeline Scroll Container -->
+    <div class="overflow-x-auto border-t-4 border-b-4 border-yellow-900 py-8">
+      <div id="timeline" class="flex space-x-2 w-max px-4 relative">
+        <!-- JS will insert slots here -->
+        <div id="timeline-line" class="absolute top-1/2 w-full border-t-2 border-yellow-900 z-0"></div>
       </div>
     </div>
 
-    <!-- Pay Button -->
-    <div class="flex justify-center mt-6">
-      <button id="payButton"
-              class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded shadow">
-        Pay for Selected Slots
+    <!-- Actions -->
+    <div class="flex flex-col sm:flex-row justify-center items-center space-y-4 sm:space-y-0 sm:space-x-4">
+      <select id="charity" class="border px-4 py-2 rounded bg-white text-sm">
+        <option value="charity1">Support Local History</option>
+        <option value="charity2">Archive Veterans' Stories</option>
+        <option value="charity3">Preserve Family Legacies</option>
+        <option value="charity4">Fund Digital Time Capsules</option>
+      </select>
+      <button id="payButton" class="bg-yellow-900 text-white px-6 py-2 rounded hover:bg-yellow-800 transition">
+        Pay & Upload ($0)
+      </button>
+      <button id="clearSelection" class="text-sm text-yellow-900 underline hover:text-yellow-700">
+        Deselect All
       </button>
     </div>
   </main>
 
+  <!-- Footer -->
+  <footer class="mt-12 text-center text-xs text-gray-500 pb-6">
+    &copy; 2025 The Digital Memory Lane. All rights reserved.
+  </footer>
+
+  <script>
+    // Inject publishable key into JS context
+    const STRIPE_PUBLIC_KEY = "{{ stripe_public_key }}";
+  </script>
 </body>
 </html>
